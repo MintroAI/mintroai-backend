@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # Rate Limiting
-    RATE_LIMIT_MAX_REQUESTS: int = 5  # Reduced for testing (100 in production)
-    SUSPICIOUS_IP_THRESHOLD: int = 3  # Reduced for testing (5 in production)
+    RATE_LIMIT_MAX_REQUESTS: int = 100  # requests per minute
+    SUSPICIOUS_IP_THRESHOLD: int = 5  # failed attempts before blocking
     IP_BLOCK_DURATION: int = 15  # minutes
     
     # CORS
@@ -27,6 +27,13 @@ class Settings(BaseSettings):
         "http://localhost:3000",  # Frontend development
         "https://app.mintroai.com"  # Production frontend
     ]
+
+    # Redis Settings
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_MAX_CONNECTIONS: int = 10
+    
+    # Challenge Settings
+    CHALLENGE_EXPIRY_SECONDS: int = 300  # 5 minutes
     
     class Config:
         env_file = ".env"
