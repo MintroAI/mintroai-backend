@@ -74,3 +74,8 @@ class Logger:
 
 # Global logger instance
 logger = Logger()
+
+@lru_cache()
+def get_logger(name: str = None) -> Logger:
+    """Get a logger instance with optional name"""
+    return Logger(name) if name else logger
