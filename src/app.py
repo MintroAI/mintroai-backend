@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.infra.config.settings import settings
 from src.core.logger.logger import logger
-from src.api.router import health
+from src.api.router import health, protected
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -23,6 +23,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Include routers
+    app.include_router(health.router, prefix="/api/v1")
+    app.include_router(protected.router, prefix="/api/v1")
+
     @app.on_event("startup")
     async def startup_event():
         logger.info("Starting API Gateway")
@@ -30,8 +34,5 @@ def create_app() -> FastAPI:
     @app.on_event("shutdown")
     async def shutdown_event():
         logger.info("Shutting down API Gateway")
-
-    # Include routers
-    app.include_router(health.router, prefix="/api/v1", tags=["health"])
 
     return app
