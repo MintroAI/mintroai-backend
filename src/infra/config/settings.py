@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "your-secret-key"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    TOKEN_BLACKLIST_EXPIRE_MARGIN_MINUTES: int = 5  # Extra time to keep blacklisted tokens
     
     # Rate Limiting
     RATE_LIMIT_MAX_REQUESTS: int = 100  # requests per minute
