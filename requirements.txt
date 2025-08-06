@@ -1,0 +1,7 @@
+#Web
+fastapi==0.116.1
+uvicorn==0.35.0
+starlette==0.47.2
+pydantic==2.10.6
+sqlalchemy==2.0.39
+pydantic-settings==2.1.1
