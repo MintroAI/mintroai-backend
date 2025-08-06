@@ -3,12 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.infra.config.settings import settings
 from src.core.logger.logger import logger
-
+from src.api.router import health
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
-        description="Backend for MintroAI",
+        description="API Gateway for MintroAI",
         version=settings.APP_VERSION,
         docs_url="/",
         redoc_url="/redoc"
@@ -25,15 +25,13 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def startup_event():
-        logger.info("Starting up application")
-        # Database connection can be initialized here
+        logger.info("Starting API Gateway")
 
     @app.on_event("shutdown")
     async def shutdown_event():
-        logger.info("Shutting down application")
-        # Cleanup tasks can be added here
+        logger.info("Shutting down API Gateway")
 
-    # Include routers here
-    # app.include_router(some_router, prefix="/api/v1", tags=["some_tag"])
+    # Include routers
+    app.include_router(health.router, prefix="/api/v1", tags=["health"])
 
     return app
