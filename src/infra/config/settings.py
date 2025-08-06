@@ -39,6 +39,12 @@ class Settings(BaseSettings):
 
     # Session Settings
     SESSION_INACTIVITY_MINUTES: int = 60  # 1 hour
+
+    # Security Settings
+    JWT_SECRET_LENGTH: int = 32  # 256 bits
+    MAX_FAILED_AUTH_ATTEMPTS: int = 5
+    AUTH_LOCKOUT_MINUTES: int = 30
+    AUDIT_LOG_RETENTION_DAYS: int = 90
     
     class Config:
         env_file = ".env"

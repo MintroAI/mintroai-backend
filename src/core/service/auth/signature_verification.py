@@ -26,7 +26,7 @@ class SignatureVerificationService:
         """Create a signable message"""
         return encode_defunct(text=message)
 
-    def verify_signature(self, message: str, signature: str, claimed_address: str) -> Tuple[bool, Optional[str]]:
+    def verify_signature(self, claimed_address: str, signature: str, message: str) -> Tuple[bool, Optional[str]]:
         """
         Verify an Ethereum signature
         
