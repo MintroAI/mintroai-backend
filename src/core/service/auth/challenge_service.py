@@ -1,19 +1,22 @@
 import secrets
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Tuple
 
 from src.core.service.auth.models.challenge import Challenge, ChallengeStatus
+from src.core.service.auth.signature_verification import SignatureVerificationService
 from src.core.logger.logger import logger
+from src.infra.config.settings import settings
 
 
 class ChallengeService:
     """Service for managing authentication challenges"""
     
-    CHALLENGE_EXPIRY_SECONDS = 300  # 5 minutes
+    CHALLENGE_EXPIRY_SECONDS = settings.CHALLENGE_EXPIRY_SECONDS
     NONCE_BYTES = 32  # 256 bits of entropy
     
-    def __init__(self, challenge_store):
+    def __init__(self, challenge_store, signature_service: Optional[SignatureVerificationService] = None):
         self.store = challenge_store
+        self.signature_service = signature_service or SignatureVerificationService()
     
     def _generate_nonce(self) -> str:
         """Generate a cryptographically secure nonce"""
@@ -45,7 +48,7 @@ class ChallengeService:
         # Generate new challenge
         nonce = self._generate_nonce()
         message = self._create_challenge_message(nonce)
-        expires_at = datetime.utcnow() + timedelta(seconds=self.CHALLENGE_EXPIRY_SECONDS)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=self.CHALLENGE_EXPIRY_SECONDS)
         
         challenge = Challenge(
             nonce=nonce,
@@ -68,12 +71,52 @@ class ChallengeService:
             return None
             
         # Check if expired
-        if datetime.utcnow() > challenge.expires_at:
+        if datetime.now(timezone.utc) > challenge.expires_at:
             challenge.status = ChallengeStatus.EXPIRED
-            await self.store.save_challenge(challenge)
+            await self.store.save_challenge(challenge) # Update status in store
             return None
             
         return challenge if challenge.status == ChallengeStatus.PENDING else None
+    
+    async def verify_challenge(self, wallet_address: str, signature: str) -> Tuple[bool, Optional[str]]:
+        """
+        Verify a challenge signature
+        
+        Args:
+            wallet_address: The wallet address that claims to have signed the challenge
+            signature: The signature to verify
+            
+        Returns:
+            Tuple[bool, Optional[str]]: (is_valid, error_message)
+        """
+        # Get active challenge
+        challenge = await self.get_active_challenge(wallet_address)
+        if not challenge:
+            error_msg = "No active challenge found"
+            logger.error(
+                error_msg,
+                extra={"wallet_address": wallet_address}
+            )
+            return False, error_msg
+        
+        # Verify signature
+        is_valid, error = self.signature_service.verify_signature(
+            message=challenge.message,
+            signature=signature,
+            claimed_address=wallet_address
+        )
+        
+        if not is_valid:
+            # Mark challenge as invalid
+            challenge.status = ChallengeStatus.INVALID
+            await self.store.save_challenge(challenge)
+            return False, error
+        
+        # Mark challenge as verified
+        challenge.status = ChallengeStatus.VERIFIED
+        await self.store.save_challenge(challenge)
+        
+        return True, None
     
     async def invalidate_challenge(self, wallet_address: str, status: ChallengeStatus) -> None:
         """Invalidate challenge for wallet address"""

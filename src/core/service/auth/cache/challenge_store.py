@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import redis.asyncio as redis
@@ -42,15 +42,35 @@ class ChallengeStore:
             data = self._serialize_challenge(challenge)
             
             # Calculate TTL in seconds
-            ttl = int((challenge.expires_at - datetime.utcnow()).total_seconds())
+            # Use challenge.expires_at - datetime.now(timezone.utc) for accurate TTL
+            ttl = int((challenge.expires_at - datetime.now(timezone.utc)).total_seconds())
             if ttl > 0:
                 await self.redis.setex(key, ttl, data)
-                logger.debug(f"Saved challenge for {challenge.wallet_address} with TTL {ttl}s")
+                logger.debug(
+                    "Saved challenge",
+                    extra={
+                        "wallet_address": challenge.wallet_address,
+                        "status": challenge.status,
+                        "ttl": ttl
+                    }
+                )
             else:
-                logger.warning(f"Attempted to save expired challenge for {challenge.wallet_address}")
+                logger.warning(
+                    "Attempted to save expired challenge",
+                    extra={
+                        "wallet_address": challenge.wallet_address,
+                        "status": challenge.status
+                    }
+                )
         
         except Exception as e:
-            logger.error(f"Error saving challenge: {str(e)}")
+            logger.error(
+                "Error saving challenge",
+                extra={
+                    "wallet_address": challenge.wallet_address,
+                    "error": str(e)
+                }
+            )
             raise
     
     async def get_challenge(self, wallet_address: str) -> Optional[Challenge]:
@@ -62,19 +82,45 @@ class ChallengeStore:
             if not data:
                 return None
             
-            return self._deserialize_challenge(data)
+            challenge = self._deserialize_challenge(data)
+            if challenge.is_expired():
+                await self.delete_challenge(wallet_address)
+                logger.warning(
+                    "Expired challenge retrieved and deleted",
+                    extra={
+                        "wallet_address": wallet_address,
+                        "status": challenge.status
+                    }
+                )
+                return None
+            return challenge
         
         except Exception as e:
-            logger.error(f"Error getting challenge: {str(e)}")
-            return None
+            logger.error(
+                "Error getting challenge",
+                extra={
+                    "wallet_address": wallet_address,
+                    "error": str(e)
+                }
+            )
+            raise
     
     async def delete_challenge(self, wallet_address: str) -> None:
         """Delete challenge from Redis"""
         try:
             key = self._get_key(wallet_address)
             await self.redis.delete(key)
-            logger.debug(f"Deleted challenge for {wallet_address}")
+            logger.debug(
+                "Deleted challenge",
+                extra={"wallet_address": wallet_address}
+            )
         
         except Exception as e:
-            logger.error(f"Error deleting challenge: {str(e)}")
+            logger.error(
+                "Error deleting challenge",
+                extra={
+                    "wallet_address": wallet_address,
+                    "error": str(e)
+                }
+            )
             raise

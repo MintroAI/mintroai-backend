@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -8,16 +8,22 @@ class ChallengeStatus(str, Enum):
     PENDING = "pending"
     USED = "used"
     EXPIRED = "expired"
+    VERIFIED = "verified"
+    INVALID = "invalid"
 
 
 class Challenge(BaseModel):
     """Challenge model for wallet authentication"""
     nonce: str = Field(..., description="Unique nonce for the challenge")
     wallet_address: str = Field(..., description="Ethereum wallet address")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime
     status: ChallengeStatus = Field(default=ChallengeStatus.PENDING)
     message: Optional[str] = Field(None, description="Challenge message to be signed")
+
+    def is_expired(self) -> bool:
+        """Check if the challenge has expired"""
+        return datetime.now(timezone.utc) > self.expires_at
 
     class Config:
         json_schema_extra = {
