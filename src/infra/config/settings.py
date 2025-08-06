@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     
     # Challenge Settings
     CHALLENGE_EXPIRY_SECONDS: int = 300  # 5 minutes
+
+    # Session Settings
+    SESSION_INACTIVITY_MINUTES: int = 60  # 1 hour
     
     class Config:
         env_file = ".env"
