@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.infra.config.settings import settings
 from src.core.logger.logger import logger
-from src.api.router import health, protected
+from src.api.router import health, protected, mock_endpoint
+from src.api.middleware.security.rate_limiter import RateLimitMiddleware
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -17,15 +18,21 @@ def create_app() -> FastAPI:
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # In production, replace with specific origins
+        allow_origins=settings.ALLOWED_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["*"],
+        max_age=600,  # 10 minutes
     )
+
+    # Rate limiting middleware
+    app.add_middleware(RateLimitMiddleware)
 
     # Include routers
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(protected.router, prefix="/api/v1")
+    app.include_router(mock_endpoint.router, prefix="/api/v1")
 
     @app.on_event("startup")
     async def startup_event():
