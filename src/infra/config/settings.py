@@ -45,6 +45,20 @@ class Settings(BaseSettings):
     MAX_FAILED_AUTH_ATTEMPTS: int = 5
     AUTH_LOCKOUT_MINUTES: int = 30
     AUDIT_LOG_RETENTION_DAYS: int = 90
+
+    # Protocol Settings
+    SUPPORTED_PROTOCOLS: List[str] = ["evm", "near"]
+    DEFAULT_PROTOCOL: str = "evm"
+    
+    # NEAR Protocol Settings
+    NEAR_NETWORK_ID: str = "testnet"  # testnet or mainnet
+    NEAR_RPC_URLS: List[str] = [
+        "https://rpc.testnet.near.org",
+        "https://test.rpc.fastnear.com"
+    ]
+    NEAR_MAX_RETRIES: int = 3
+    NEAR_TIMEOUT_SECONDS: int = 30
+    NEAR_ENABLED: bool = True
     
     class Config:
         env_file = ".env"
