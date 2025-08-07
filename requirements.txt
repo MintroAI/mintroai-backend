@@ -13,6 +13,9 @@ redis[hiredis]==5.0.1
 eth-account==0.8.0
 eth-typing==3.5.2
 web3==6.11.4
+py-near==1.1.57
+base58==2.1.1
+ed25519==1.5
 
 #Testing
 pytest==8.0.2
