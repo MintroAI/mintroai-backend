@@ -11,7 +11,9 @@ from src.core.service.auth.cache.audit_store import AuthAuditStore
 from src.core.service.auth.models.audit import AuthEventType, AuthEventStatus
 from src.core.service.auth.models.session import DeviceInfo
 from src.core.service.auth.security_service import SecurityService
-from src.core.service.auth.signature_verification import SignatureVerificationService
+from src.core.service.auth.multi_protocol_signature_service import MultiProtocolSignatureService
+from src.core.service.auth.protocols.base import protocol_registry, BlockchainProtocol
+from src.core.service.auth.protocols.evm import create_evm_verifier
 from src.infra.config.redis import get_redis
 from src.infra.config.settings import get_settings
 
@@ -52,19 +54,25 @@ async def audit_store(redis_client):
 
 
 @pytest.fixture
-def signature_service():
-    return SignatureVerificationService()
+async def signature_service():
+    # Initialize EVM verifier for tests
+    evm_verifier = create_evm_verifier("mainnet", chain_id=1)
+    await evm_verifier.initialize()
+    protocol_registry.register(evm_verifier)
+    service = MultiProtocolSignatureService()
+    yield service
 
 
 @pytest.fixture
 async def security_service(audit_store, signature_service):
     async for store in audit_store:
-        service = SecurityService(store, signature_service)
-        try:
-            yield service
-        finally:
-            # Cleanup if needed
-            pass
+        async for sig_service in signature_service:
+            service = SecurityService(store, sig_service)
+            try:
+                yield service
+            finally:
+                # Cleanup if needed
+                pass
 
 
 def sign_message(message: str, private_key: bytes) -> str:
@@ -102,6 +110,7 @@ async def test_verify_sensitive_operation_success(security_service):
             message,
             TEST_DEVICE_INFO,
             "transfer",
+            BlockchainProtocol.EVM,
             uuid4()
         )
 
@@ -131,6 +140,7 @@ async def test_verify_sensitive_operation_failure(security_service):
             wrong_message,
             TEST_DEVICE_INFO,
             "transfer",
+            BlockchainProtocol.EVM,
             uuid4()
         )
 
@@ -173,6 +183,7 @@ async def test_account_lockout(security_service):
                 message,
                 TEST_DEVICE_INFO,
                 "transfer",
+                BlockchainProtocol.EVM,
                 uuid4()
             )
 
@@ -227,6 +238,7 @@ async def test_reset_failed_attempts(security_service):
             message,
             TEST_DEVICE_INFO,
             "transfer",
+            BlockchainProtocol.EVM,
             uuid4()
         )
         assert result is True
