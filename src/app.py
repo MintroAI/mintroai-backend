@@ -48,6 +48,13 @@ def create_app() -> FastAPI:
             "service": settings.APP_NAME,
             "version": settings.APP_VERSION
         }))
+        
+        # Initialize protocol verifiers
+        try:
+            from src.api.router.auth import init_protocols
+            await init_protocols()
+        except Exception as e:
+            logger.error(f"Failed to initialize protocols on startup: {str(e)}")
 
     @app.on_event("shutdown")
     async def shutdown_event():
