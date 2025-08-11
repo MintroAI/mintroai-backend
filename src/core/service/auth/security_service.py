@@ -23,7 +23,7 @@ settings = get_settings()
 
 
 class SecurityService:
-    """Service for handling security-related operations across multiple blockchain protocols"""
+    """Service for handling security-related operations"""
 
     def __init__(
         self,
@@ -31,7 +31,7 @@ class SecurityService:
         signature_service: MultiProtocolSignatureService
     ):
         self.audit_store = audit_store
-        self.multi_signature_service = signature_service
+        self.signature_service = signature_service
         self.jwt_secret_length = settings.JWT_SECRET_LENGTH
 
     def generate_secure_secret(self) -> str:
@@ -45,12 +45,12 @@ class SecurityService:
         message: str,
         device_info: DeviceInfo,
         operation_type: str,
-        protocol: BlockchainProtocol = BlockchainProtocol.EVM,
+        protocol: BlockchainProtocol,
         session_id: Optional[UUID] = None,
         **kwargs
     ) -> bool:
         """
-        Verify signature for sensitive operations across multiple blockchain protocols
+        Verify signature for sensitive operations
         Returns True if verification successful, False otherwise
         """
         try:
@@ -74,11 +74,11 @@ class SecurityService:
 
             # Verify signature using multi-protocol service
             try:
-                is_valid, error = await self.multi_signature_service.verify_signature(
-                    protocol=protocol,
+                is_valid, error = await self.signature_service.verify_signature(
                     address=wallet_address,
                     message=message,
                     signature=signature,
+                    protocol=protocol,
                     **kwargs
                 )
                 if not is_valid:
