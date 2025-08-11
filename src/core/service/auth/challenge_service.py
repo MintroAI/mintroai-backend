@@ -3,7 +3,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 from src.core.service.auth.models.challenge import Challenge, ChallengeStatus
-from src.core.service.auth.signature_verification import SignatureVerificationService
+from src.core.service.auth.multi_protocol_signature_service import MultiProtocolSignatureService
+from src.core.service.auth.protocols.base import BlockchainProtocol
 from src.core.logger.logger import logger
 from src.infra.config.settings import settings
 
@@ -14,30 +15,20 @@ class ChallengeService:
     CHALLENGE_EXPIRY_SECONDS = settings.CHALLENGE_EXPIRY_SECONDS
     NONCE_BYTES = 32  # 256 bits of entropy
     
-    def __init__(self, challenge_store, signature_service: Optional[SignatureVerificationService] = None):
+    def __init__(self, challenge_store, signature_service: Optional[MultiProtocolSignatureService] = None):
         self.store = challenge_store
-        self.signature_service = signature_service or SignatureVerificationService()
+        self.signature_service = signature_service or MultiProtocolSignatureService()
     
     def _generate_nonce(self) -> str:
         """Generate a cryptographically secure nonce"""
         return "0x" + secrets.token_hex(self.NONCE_BYTES)
     
-    def _create_challenge_message(self, nonce: str) -> str:
-        """Create a standard message format for signing"""
-        return f"Sign in to MintroAI\nNonce: {nonce}"
-    
-    async def create_challenge(self, wallet_address: str) -> Challenge:
+    async def create_challenge(self, wallet_address: str, protocol: BlockchainProtocol) -> Challenge:
         """Create a new challenge for wallet authentication"""
-        # Validate wallet address format
-        wallet_address = wallet_address.lower()
-        if not wallet_address.startswith("0x") or len(wallet_address) != 42:
-            raise ValueError("Invalid wallet address format")
-        
-        # Validate hex characters
-        try:
-            int(wallet_address[2:], 16)
-        except ValueError:
-            raise ValueError("Invalid wallet address format")
+        # Validate wallet address format using protocol-specific validation
+        is_valid, error_msg = self.signature_service.validate_address(wallet_address, protocol)
+        if not is_valid:
+            raise ValueError(f"Invalid {protocol.value} address: {error_msg}")
             
         # Check for existing challenge
         existing = await self.get_active_challenge(wallet_address)
@@ -47,12 +38,17 @@ class ChallengeService:
             
         # Generate new challenge
         nonce = self._generate_nonce()
-        message = self._create_challenge_message(nonce)
+        message = self.signature_service.create_challenge_message(
+            nonce, 
+            protocol,
+            account_id=wallet_address if protocol == BlockchainProtocol.NEAR else None
+        )
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=self.CHALLENGE_EXPIRY_SECONDS)
         
         challenge = Challenge(
             nonce=nonce,
             wallet_address=wallet_address,
+            protocol=protocol.value,
             expires_at=expires_at,
             message=message
         )
@@ -78,13 +74,21 @@ class ChallengeService:
             
         return challenge if challenge.status == ChallengeStatus.PENDING else None
     
-    async def verify_challenge(self, wallet_address: str, signature: str) -> Tuple[bool, Optional[str]]:
+    async def verify_challenge(
+        self, 
+        wallet_address: str, 
+        signature: str, 
+        protocol: BlockchainProtocol,
+        **kwargs
+    ) -> Tuple[bool, Optional[str]]:
         """
         Verify a challenge signature
         
         Args:
             wallet_address: The wallet address that claims to have signed the challenge
             signature: The signature to verify
+            protocol: The blockchain protocol
+            **kwargs: Protocol-specific parameters (e.g., public_key for NEAR)
             
         Returns:
             Tuple[bool, Optional[str]]: (is_valid, error_message)
@@ -95,27 +99,43 @@ class ChallengeService:
             error_msg = "No active challenge found"
             logger.error(
                 error_msg,
-                extra={"wallet_address": wallet_address}
+                extra={"wallet_address": wallet_address, "protocol": protocol.value}
             )
             return False, error_msg
         
-        # Verify signature
-        is_valid, error = self.signature_service.verify_signature(
+        # Verify protocol matches
+        if challenge.protocol != protocol.value:
+            error_msg = f"Protocol mismatch: challenge created for {challenge.protocol}, verification requested for {protocol.value}"
+            logger.error(error_msg, extra={"wallet_address": wallet_address})
+            return False, error_msg
+        
+        # Verify signature using multi-protocol service
+        is_valid, error = await self.signature_service.verify_signature(
+            address=wallet_address,
             message=challenge.message,
             signature=signature,
-            claimed_address=wallet_address
+            protocol=protocol,
+            **kwargs
         )
         
         if not is_valid:
             # Mark challenge as invalid
             challenge.status = ChallengeStatus.INVALID
             await self.store.save_challenge(challenge)
+            logger.warning(
+                f"Challenge verification failed for {wallet_address}",
+                extra={"protocol": protocol.value, "error": error}
+            )
             return False, error
         
         # Mark challenge as verified
         challenge.status = ChallengeStatus.VERIFIED
         await self.store.save_challenge(challenge)
         
+        logger.info(
+            f"Challenge verified successfully for {wallet_address}",
+            extra={"protocol": protocol.value}
+        )
         return True, None
     
     async def invalidate_challenge(self, wallet_address: str, status: ChallengeStatus) -> None:

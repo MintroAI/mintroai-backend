@@ -14,7 +14,8 @@ from src.core.service.auth.models.audit import (
     AuthEventContext
 )
 from src.core.service.auth.models.session import DeviceInfo
-from src.core.service.auth.signature_verification import SignatureVerificationService
+from src.core.service.auth.multi_protocol_signature_service import MultiProtocolSignatureService
+from src.core.service.auth.protocols.base import BlockchainProtocol
 from src.infra.config.settings import get_settings
 
 logger = get_logger(__name__)
@@ -27,7 +28,7 @@ class SecurityService:
     def __init__(
         self,
         audit_store: AuthAuditStore,
-        signature_service: SignatureVerificationService
+        signature_service: MultiProtocolSignatureService
     ):
         self.audit_store = audit_store
         self.signature_service = signature_service
@@ -44,7 +45,9 @@ class SecurityService:
         message: str,
         device_info: DeviceInfo,
         operation_type: str,
-        session_id: Optional[UUID] = None
+        protocol: BlockchainProtocol,
+        session_id: Optional[UUID] = None,
+        **kwargs
     ) -> bool:
         """
         Verify signature for sensitive operations
@@ -69,12 +72,14 @@ class SecurityService:
                     detail="Account is locked due to too many failed attempts"
                 )
 
-            # Verify signature
+            # Verify signature using multi-protocol service
             try:
-                is_valid, error = self.signature_service.verify_signature(
-                    claimed_address=wallet_address,
+                is_valid, error = await self.signature_service.verify_signature(
+                    address=wallet_address,
+                    message=message,
                     signature=signature,
-                    message=message
+                    protocol=protocol,
+                    **kwargs
                 )
                 if not is_valid:
                     raise ValueError(error or "Invalid signature")

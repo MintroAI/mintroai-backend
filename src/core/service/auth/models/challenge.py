@@ -15,7 +15,8 @@ class ChallengeStatus(str, Enum):
 class Challenge(BaseModel):
     """Challenge model for wallet authentication"""
     nonce: str = Field(..., description="Unique nonce for the challenge")
-    wallet_address: str = Field(..., description="Ethereum wallet address")
+    wallet_address: str = Field(..., description="Wallet address or account ID")
+    protocol: str = Field(default="evm", description="Blockchain protocol (evm, near)")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime
     status: ChallengeStatus = Field(default=ChallengeStatus.PENDING)
@@ -40,13 +41,21 @@ class Challenge(BaseModel):
 
 class ChallengeRequest(BaseModel):
     """Request model for challenge generation"""
-    wallet_address: str = Field(..., description="Ethereum wallet address to generate challenge for")
+    wallet_address: str = Field(..., description="Wallet address or account ID to generate challenge for")
+    protocol: str = Field(default="evm", description="Blockchain protocol (evm, near)")
 
     class Config:
         json_schema_extra = {
-            "example": {
-                "wallet_address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
-            }
+            "examples": [
+                {
+                    "wallet_address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+                    "protocol": "evm"
+                },
+                {
+                    "wallet_address": "alice.testnet",
+                    "protocol": "near"
+                }
+            ]
         }
 
 
