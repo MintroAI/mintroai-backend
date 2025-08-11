@@ -154,9 +154,6 @@ class NEARVerifier(WalletVerifier):
             public_key: Base58-encoded public key (optional, will query if not provided)
         """
         try:
-            if not self._connection_established:
-                return False, "NEAR provider not initialized"
-            
             # Validate address first
             is_valid_address, addr_error = self.validate_address(address)
             if not is_valid_address:
@@ -164,6 +161,8 @@ class NEARVerifier(WalletVerifier):
             
             # Get public key if not provided
             if not public_key:
+                if not self._connection_established:
+                    return False, "NEAR provider not initialized - public key required for offline verification"
                 public_key = await self._get_account_public_key(address)
                 if not public_key:
                     return False, "Could not retrieve public key for account"

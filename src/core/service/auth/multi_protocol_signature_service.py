@@ -1,121 +1,97 @@
 """
-Multi-Protocol Signature Verification Service.
-This service provides a unified interface for verifying signatures across different blockchain protocols.
+Multi-protocol signature verification service.
+This service acts as a facade for different blockchain protocol verifiers.
 """
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 
-from src.core.service.auth.protocols.base import protocol_registry, BlockchainProtocol
+from src.core.service.auth.protocols.base import BlockchainProtocol, protocol_registry, WalletVerifier
 from src.core.logger.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class MultiProtocolSignatureService:
-    """Service for verifying wallet signatures across multiple blockchain protocols"""
+    """
+    Multi-protocol signature verification service that delegates to appropriate protocol verifiers.
+    This service provides a unified interface for signature verification across different blockchain protocols.
+    """
     
     def __init__(self):
-        self.registry = protocol_registry
+        self.logger = get_logger(__name__)
     
-    async def verify_signature(
-        self,
-        protocol: BlockchainProtocol,
-        address: str,
-        message: str,
-        signature: str,
-        **kwargs
-    ) -> Tuple[bool, Optional[str]]:
+    def _get_verifier(self, protocol: BlockchainProtocol) -> WalletVerifier:
+        """Get the appropriate verifier for the given protocol"""
+        verifier = protocol_registry.get_verifier(protocol)
+        if not verifier:
+            supported_protocols = [p.value for p in protocol_registry.get_supported_protocols()]
+            raise ValueError(
+                f"Protocol '{protocol.value}' is not supported. "
+                f"Supported protocols: {supported_protocols}"
+            )
+        return verifier
+    
+    def validate_address(self, address: str, protocol: BlockchainProtocol) -> Tuple[bool, Optional[str]]:
         """
-        Verify a signature for the specified protocol
+        Validate address format for the specified protocol
         
         Args:
-            protocol: The blockchain protocol (evm, near, etc.)
-            address: The address/account ID that claims to have signed
-            message: The original message that was signed
-            signature: The signature to verify
-            **kwargs: Protocol-specific additional parameters (e.g., public_key for NEAR)
+            address: The address to validate
+            protocol: The blockchain protocol
             
         Returns:
             Tuple[bool, Optional[str]]: (is_valid, error_message)
         """
         try:
-            # Get the appropriate verifier for the protocol
-            verifier = self.registry.get_verifier(protocol)
-            if not verifier:
-                error_msg = f"Protocol '{protocol}' is not supported or not registered"
-                logger.error(
-                    error_msg,
-                    extra={
-                        "protocol": protocol,
-                        "address": address,
-                        "supported_protocols": [p.value for p in self.registry.get_supported_protocols()]
-                    }
-                )
-                return False, error_msg
+            verifier = self._get_verifier(protocol)
+            return verifier.validate_address(address)
+        except Exception as e:
+            error_msg = f"Address validation error for protocol {protocol.value}: {str(e)}"
+            self.logger.error(error_msg)
+            return False, error_msg
+    
+    async def verify_signature(
+        self,
+        address: str,
+        message: str,
+        signature: str,
+        protocol: BlockchainProtocol,
+        **kwargs
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Verify a signature using the appropriate protocol verifier
+        
+        Args:
+            address: The address that claims to have signed
+            message: The original message that was signed
+            signature: The signature to verify
+            protocol: The blockchain protocol
+            **kwargs: Protocol-specific additional parameters
             
-            # Verify signature using the protocol-specific verifier
-            is_valid, error = await verifier.verify_signature(
+        Returns:
+            Tuple[bool, Optional[str]]: (is_valid, error_message)
+        """
+        try:
+            verifier = self._get_verifier(protocol)
+            
+            self.logger.debug(
+                f"Verifying signature for protocol {protocol.value}",
+                extra={
+                    "protocol": protocol.value,
+                    "address": address
+                }
+            )
+            
+            return await verifier.verify_signature(
                 address=address,
                 message=message,
                 signature=signature,
                 **kwargs
             )
             
-            if is_valid:
-                logger.info(
-                    "Multi-protocol signature verified successfully",
-                    extra={
-                        "protocol": protocol.value,
-                        "address": address
-                    }
-                )
-            else:
-                logger.warning(
-                    "Multi-protocol signature verification failed",
-                    extra={
-                        "protocol": protocol.value,
-                        "address": address,
-                        "error": error
-                    }
-                )
-            
-            return is_valid, error
-            
         except Exception as e:
-            error_msg = f"Signature verification failed: {str(e)}"
-            logger.error(
-                error_msg,
-                extra={
-                    "protocol": protocol.value,
-                    "address": address,
-                    "error": str(e)
-                }
-            )
-            return False, error_msg
-    
-    def validate_address(self, protocol: BlockchainProtocol, address: str) -> Tuple[bool, Optional[str]]:
-        """
-        Validate an address for the specified protocol
-        
-        Args:
-            protocol: The blockchain protocol
-            address: The address to validate
-            
-        Returns:
-            Tuple[bool, Optional[str]]: (is_valid, error_message)
-        """
-        try:
-            verifier = self.registry.get_verifier(protocol)
-            if not verifier:
-                error_msg = f"Protocol '{protocol}' is not supported"
-                logger.error(error_msg, extra={"protocol": protocol, "address": address})
-                return False, error_msg
-            
-            return verifier.validate_address(address)
-            
-        except Exception as e:
-            error_msg = f"Address validation failed: {str(e)}"
-            logger.error(
+            error_msg = f"Signature verification error for protocol {protocol.value}: {str(e)}"
+            self.logger.error(
                 error_msg,
                 extra={
                     "protocol": protocol.value,
@@ -127,46 +103,54 @@ class MultiProtocolSignatureService:
     
     def create_challenge_message(
         self,
-        protocol: BlockchainProtocol,
         nonce: str,
+        protocol: BlockchainProtocol,
         **kwargs
-    ) -> Optional[str]:
+    ) -> str:
         """
         Create a protocol-specific challenge message
         
         Args:
-            protocol: The blockchain protocol
             nonce: Unique nonce for the challenge
+            protocol: The blockchain protocol
             **kwargs: Protocol-specific parameters
             
         Returns:
-            Optional[str]: Challenge message or None if protocol not supported
+            str: Formatted challenge message
         """
         try:
-            verifier = self.registry.get_verifier(protocol)
-            if not verifier:
-                logger.error(
-                    f"Protocol '{protocol}' is not supported",
-                    extra={"protocol": protocol}
-                )
-                return None
-            
-            message = verifier.create_challenge_message(nonce, **kwargs)
-            logger.debug(
-                "Created challenge message",
-                extra={
-                    "protocol": protocol.value,
-                    "nonce": nonce
-                }
-            )
-            return message
-            
+            verifier = self._get_verifier(protocol)
+            return verifier.create_challenge_message(nonce, **kwargs)
         except Exception as e:
-            logger.error(
-                f"Failed to create challenge message: {str(e)}",
+            error_msg = f"Challenge message creation error for protocol {protocol.value}: {str(e)}"
+            self.logger.error(error_msg)
+            # Fallback to generic message
+            return f"Sign in to MintroAI\nNonce: {nonce}"
+    
+    async def get_account_info(
+        self,
+        address: str,
+        protocol: BlockchainProtocol
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get account information for the specified protocol
+        
+        Args:
+            address: The address to query
+            protocol: The blockchain protocol
+            
+        Returns:
+            Optional[Dict[str, Any]]: Account information or None if not found
+        """
+        try:
+            verifier = self._get_verifier(protocol)
+            return await verifier.get_account_info(address)
+        except Exception as e:
+            self.logger.error(
+                f"Account info retrieval error for protocol {protocol.value}: {str(e)}",
                 extra={
                     "protocol": protocol.value,
-                    "nonce": nonce,
+                    "address": address,
                     "error": str(e)
                 }
             )
@@ -174,68 +158,17 @@ class MultiProtocolSignatureService:
     
     def get_supported_protocols(self) -> list[BlockchainProtocol]:
         """Get list of supported protocols"""
-        return self.registry.get_supported_protocols()
+        return protocol_registry.get_supported_protocols()
     
     def is_protocol_supported(self, protocol: BlockchainProtocol) -> bool:
         """Check if a protocol is supported"""
-        return protocol in self.get_supported_protocols()
-
-
-# Backward compatibility: create an instance that mimics the old SignatureVerificationService
-class SignatureVerificationService:
-    """
-    Backward compatibility wrapper for the old SignatureVerificationService.
-    Defaults to EVM protocol for existing code.
-    """
+        return protocol_registry.get_verifier(protocol) is not None
     
-    def __init__(self):
-        self.multi_service = MultiProtocolSignatureService()
-        self.default_protocol = BlockchainProtocol.EVM
-    
-    def verify_signature(self, claimed_address: str, signature: str, message: str) -> Tuple[bool, Optional[str]]:
-        """
-        Verify signature using EVM protocol (backward compatibility)
-        
-        Args:
-            claimed_address: The address that claims to have signed
-            signature: The signature to verify
-            message: The original message that was signed
-            
-        Returns:
-            Tuple[bool, Optional[str]]: (is_valid, error_message)
-        """
-        # Import here to avoid circular imports
-        import asyncio
-        
-        # Run the async verification in sync context
-        loop = None
+    def get_protocol_info(self, protocol: BlockchainProtocol) -> Optional[Dict[str, Any]]:
+        """Get information about a specific protocol"""
         try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        if loop.is_running():
-            # If we're already in an async context, we need to use run_until_complete
-            # This is a workaround for backward compatibility
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(
-                    asyncio.run,
-                    self.multi_service.verify_signature(
-                        protocol=self.default_protocol,
-                        address=claimed_address,
-                        message=message,
-                        signature=signature
-                    )
-                )
-                return future.result()
-        else:
-            return loop.run_until_complete(
-                self.multi_service.verify_signature(
-                    protocol=self.default_protocol,
-                    address=claimed_address,
-                    message=message,
-                    signature=signature
-                )
-            )
+            verifier = self._get_verifier(protocol)
+            return verifier.get_protocol_info()
+        except Exception as e:
+            self.logger.error(f"Error getting protocol info for {protocol.value}: {str(e)}")
+            return None

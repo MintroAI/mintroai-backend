@@ -13,7 +13,7 @@ from src.core.service.auth.models.challenge import Challenge, ChallengeStatus
 from src.core.service.auth.challenge_service import ChallengeService
 from src.core.service.auth.cache.challenge_store import ChallengeStore
 from src.core.service.auth.multi_protocol_signature_service import MultiProtocolSignatureService
-from src.core.service.auth.protocols.base import protocol_registry
+from src.core.service.auth.protocols.base import protocol_registry, BlockchainProtocol
 from src.core.service.auth.protocols.evm import create_evm_verifier
 from src.infra.config.redis import get_redis
 
@@ -55,9 +55,9 @@ async def test_create_challenge():
         
         wallet_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
         
-        challenge = await challenge_service.create_challenge(wallet_address)
+        challenge = await challenge_service.create_challenge(wallet_address, BlockchainProtocol.EVM)
         
-        assert challenge.wallet_address == wallet_address.lower()
+        assert challenge.wallet_address == wallet_address  # EVM validation preserves checksum format
         assert challenge.nonce.startswith("0x")
         assert len(challenge.nonce) == 66  # 0x + 64 hex chars
         assert challenge.status == ChallengeStatus.PENDING
@@ -80,7 +80,7 @@ async def test_challenge_expiry():
         wallet_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
         
         # Create challenge and wait for expiry logic
-        challenge = await challenge_service.create_challenge(wallet_address)
+        challenge = await challenge_service.create_challenge(wallet_address, BlockchainProtocol.EVM)
         
         # Manually expire the challenge by setting past expiry time
         challenge.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
@@ -118,10 +118,10 @@ async def test_duplicate_challenge():
         wallet_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
         
         # Create first challenge
-        challenge1 = await challenge_service.create_challenge(wallet_address)
+        challenge1 = await challenge_service.create_challenge(wallet_address, BlockchainProtocol.EVM)
         
         # Request another challenge
-        challenge2 = await challenge_service.create_challenge(wallet_address)
+        challenge2 = await challenge_service.create_challenge(wallet_address, BlockchainProtocol.EVM)
         
         # Should return the same challenge
         assert challenge1.nonce == challenge2.nonce
@@ -155,7 +155,7 @@ async def test_invalid_wallet_address():
         
         for address in invalid_addresses:
             with pytest.raises(ValueError, match="Invalid evm address"):
-                await challenge_service.create_challenge(address)
+                await challenge_service.create_challenge(address, BlockchainProtocol.EVM)
                 
     finally:
         await redis_client.flushdb()
@@ -178,7 +178,7 @@ async def test_challenge_invalidation():
         wallet_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
         
         # Create challenge
-        challenge = await challenge_service.create_challenge(wallet_address)
+        challenge = await challenge_service.create_challenge(wallet_address, BlockchainProtocol.EVM)
         assert challenge.status == ChallengeStatus.PENDING
         
         # Invalidate challenge
@@ -198,16 +198,12 @@ async def test_challenge_invalidation():
 async def test_verify_challenge_success(test_wallet):
     """Test successful challenge verification"""
     # Setup
-    redis_client = await get_redis()
-    await redis_client.flushdb()
+    challenge_service, redis_client = await setup_challenge_service()
     
     try:
-        store = ChallengeStore(redis_client)
-        multi_signature_service = MultiProtocolSignatureService()
-        challenge_service = ChallengeService(store, multi_signature_service)
         
         # Create challenge
-        challenge = await challenge_service.create_challenge(test_wallet['address'])
+        challenge = await challenge_service.create_challenge(test_wallet['address'], BlockchainProtocol.EVM)
         
         # Sign the challenge message
         signable_message = encode_defunct(text=challenge.message)
@@ -216,7 +212,8 @@ async def test_verify_challenge_success(test_wallet):
         # Verify the signature
         is_valid, error = await challenge_service.verify_challenge(
             wallet_address=test_wallet['address'],
-            signature=signed_message.signature
+            signature=signed_message.signature,
+            protocol=BlockchainProtocol.EVM
         )
         
         assert is_valid is True
@@ -236,16 +233,12 @@ async def test_verify_challenge_success(test_wallet):
 async def test_verify_challenge_wrong_signature(test_wallet):
     """Test challenge verification with wrong signature"""
     # Setup
-    redis_client = await get_redis()
-    await redis_client.flushdb()
+    challenge_service, redis_client = await setup_challenge_service()
     
     try:
-        store = ChallengeStore(redis_client)
-        multi_signature_service = MultiProtocolSignatureService()
-        challenge_service = ChallengeService(store, multi_signature_service)
         
         # Create challenge
-        challenge = await challenge_service.create_challenge(test_wallet['address'])
+        challenge = await challenge_service.create_challenge(test_wallet['address'], BlockchainProtocol.EVM)
         
         # Sign a different message
         different_message = "Different message"
@@ -255,7 +248,8 @@ async def test_verify_challenge_wrong_signature(test_wallet):
         # Verify the signature
         is_valid, error = await challenge_service.verify_challenge(
             wallet_address=test_wallet['address'],
-            signature=signed_message.signature
+            signature=signed_message.signature,
+            protocol=BlockchainProtocol.EVM
         )
         
         assert is_valid is False
@@ -286,7 +280,8 @@ async def test_verify_challenge_no_active_challenge(test_wallet):
         # Try to verify without creating a challenge
         is_valid, error = await challenge_service.verify_challenge(
             wallet_address=test_wallet['address'],
-            signature="0x1234567890"
+            signature="0x1234567890",
+            protocol=BlockchainProtocol.EVM
         )
         
         assert is_valid is False
@@ -302,16 +297,12 @@ async def test_verify_challenge_no_active_challenge(test_wallet):
 async def test_verify_challenge_invalid_signature_format(test_wallet):
     """Test challenge verification with invalid signature format"""
     # Setup
-    redis_client = await get_redis()
-    await redis_client.flushdb()
+    challenge_service, redis_client = await setup_challenge_service()
     
     try:
-        store = ChallengeStore(redis_client)
-        multi_signature_service = MultiProtocolSignatureService()
-        challenge_service = ChallengeService(store, multi_signature_service)
         
         # Create challenge
-        await challenge_service.create_challenge(test_wallet['address'])
+        await challenge_service.create_challenge(test_wallet['address'], BlockchainProtocol.EVM)
         
         invalid_signatures = [
             "invalid",
@@ -322,11 +313,12 @@ async def test_verify_challenge_invalid_signature_format(test_wallet):
         
         for signature in invalid_signatures:
             # Create a new challenge for each invalid signature test
-            await challenge_service.create_challenge(test_wallet['address'])
+            await challenge_service.create_challenge(test_wallet['address'], BlockchainProtocol.EVM)
             
             is_valid, error = await challenge_service.verify_challenge(
                 wallet_address=test_wallet['address'],
-                signature=signature
+                signature=signature,
+                protocol=BlockchainProtocol.EVM
             )
             
             assert is_valid is False
