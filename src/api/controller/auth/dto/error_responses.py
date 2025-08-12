@@ -2,7 +2,7 @@
 Standardized error response DTOs for authentication API.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -46,6 +46,11 @@ class ErrorDetail(BaseModel):
     field: Optional[str] = Field(None, description="Field name for validation errors")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
     request_id: Optional[str] = Field(None, description="Request ID for tracking")
+    
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, timestamp: datetime) -> str:
+        """Serialize datetime to ISO format with Z suffix."""
+        return timestamp.isoformat() + "Z"
 
 
 class ErrorResponse(BaseModel):
@@ -53,11 +58,6 @@ class ErrorResponse(BaseModel):
     
     error: ErrorDetail = Field(..., description="Error details")
     status_code: int = Field(..., description="HTTP status code")
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat() + "Z"
-        }
 
 
 class ValidationErrorResponse(BaseModel):
@@ -77,11 +77,11 @@ class RateLimitErrorResponse(BaseModel):
     error: ErrorDetail = Field(..., description="Error details")
     retry_after: int = Field(..., description="Seconds to wait before retry")
     limit: int = Field(..., description="Rate limit threshold")
-    remaining: int = Field(0, description="Remaining requests")
+    remaining: int = Field(0, description="remaining requests")
     reset_time: datetime = Field(..., description="When the rate limit resets")
     status_code: int = Field(429, description="HTTP status code")
     
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat() + "Z"
-        }
+    @field_serializer('reset_time')
+    def serialize_reset_time(self, reset_time: datetime) -> str:
+        """Serialize datetime to ISO format with Z suffix."""
+        return reset_time.isoformat() + "Z"

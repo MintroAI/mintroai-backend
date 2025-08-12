@@ -30,7 +30,17 @@ from src.core.logger.logger import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(
+    prefix="/auth", 
+    tags=["Authentication"],
+    responses={
+        400: {"description": "Bad Request - Invalid input data"},
+        401: {"description": "Unauthorized - Invalid credentials or token"},
+        403: {"description": "Forbidden - IP blocked or access denied"},
+        429: {"description": "Too Many Requests - Rate limit exceeded"},
+        500: {"description": "Internal Server Error"}
+    }
+)
 
 
 # Initialize protocol verifiers
@@ -62,7 +72,7 @@ async def init_protocols():
                 protocol_registry.register(near_verifier)
                 logger.info("NEAR verifier registered in offline mode")
         
-        logger.info(f"Initialized {len(protocol_registry.verifiers)} protocol verifiers")
+        logger.info(f"Initialized {len(protocol_registry._verifiers)} protocol verifiers")
         
     except Exception as e:
         logger.error(f"Failed to initialize protocol verifiers: {str(e)}")
@@ -88,16 +98,51 @@ async def get_jwt_service() -> JWTService:
     return JWTService(token_store)
 
 
-@router.post("/challenge", response_model=ChallengeResponseDto)
+@router.post(
+    "/challenge", 
+    response_model=ChallengeResponseDto,
+    summary="Create Authentication Challenge",
+    description="Generate a challenge message that must be signed by the wallet to prove ownership",
+    responses={
+        200: {
+            "description": "Challenge created successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "nonce": "0x1234567890abcdef...",
+                        "message": "Sign in to MintroAI\\nNonce: 0x1234567890abcdef...",
+                        "expires_in": 300,
+                        "protocol": "evm"
+                    }
+                }
+            }
+        }
+    }
+)
 async def create_challenge(
     request: ChallengeRequestDto,
     challenge_service: ChallengeService = Depends(get_challenge_service)
 ):
     """
-    Create a new authentication challenge for a wallet address.
+    **Create Authentication Challenge**
     
-    The challenge must be signed by the wallet to prove ownership.
-    Supports both EVM and NEAR protocols with protocol-specific validation.
+    Creates a unique challenge message that must be signed by the wallet to prove ownership.
+    
+    **Supported Protocols:**
+    - `evm`: Ethereum and EVM-compatible chains
+    - `near`: NEAR Protocol
+    
+    **Process:**
+    1. Validates the wallet address format for the specified protocol
+    2. Generates a unique nonce and challenge message
+    3. Returns the challenge with expiration time (5 minutes)
+    
+    **Example Usage:**
+    ```bash
+    curl -X POST "/api/v1/auth/challenge" \\
+         -H "Content-Type: application/json" \\
+         -d '{"wallet_address": "0x742d35Cc6634C0532925a3b8D0C1a0e3A4b4e9C8", "protocol": "evm"}'
+    ```
     """
     try:
         # Enhanced validation using our validators
@@ -137,13 +182,13 @@ async def create_challenge(
         logger.warning(f"Invalid challenge request: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": {
-                    "code": ErrorCode.INVALID_INPUT,
-                    "message": str(e),
-                    "timestamp": datetime.utcnow().isoformat() + "Z"
+                            detail={
+                    "error": {
+                        "code": ErrorCode.INVALID_INPUT.value,
+                        "message": str(e),
+                        "timestamp": datetime.utcnow().isoformat() + "Z"
+                    }
                 }
-            }
         )
         
     except Exception as e:
@@ -152,7 +197,7 @@ async def create_challenge(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "error": {
-                    "code": ErrorCode.INTERNAL_ERROR,
+                    "code": ErrorCode.INTERNAL_ERROR.value,
                     "message": "Failed to create challenge",
                     "timestamp": datetime.utcnow().isoformat() + "Z"
                 }

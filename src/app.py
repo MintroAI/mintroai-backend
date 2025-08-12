@@ -13,10 +13,65 @@ from src.api.middleware.logging.request_logging import RequestLoggingMiddleware
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
-        description="API Gateway for MintroAI",
+        description="""
+# MintroAI Multi-Protocol Authentication API
+
+A comprehensive authentication system supporting multiple blockchain protocols.
+
+## Supported Protocols
+- **EVM**: Ethereum and EVM-compatible chains (Polygon, BSC, etc.)
+- **NEAR**: NEAR Protocol blockchain
+
+## Authentication Flow
+1. **Challenge Creation**: Generate a unique challenge message
+2. **Signature Verification**: Sign the challenge with your wallet
+3. **Token Generation**: Receive JWT tokens for authenticated access
+4. **Session Management**: Manage active sessions and refresh tokens
+
+## Key Features
+- 🔒 **Multi-Protocol Support**: EVM and NEAR protocols
+- 🚀 **Rate Limiting**: Protection against abuse
+- 📊 **Comprehensive Monitoring**: Metrics and health checks
+- 🛡️ **Security**: Audit logging and IP blocking
+- 📚 **Complete Documentation**: OpenAPI 3.0 specification
+
+## Quick Start
+```bash
+# 1. Create a challenge
+curl -X POST "/api/v1/auth/challenge" \\
+     -H "Content-Type: application/json" \\
+     -d '{"wallet_address": "0x...", "protocol": "evm"}'
+
+# 2. Sign the challenge message with your wallet
+
+# 3. Verify the signature
+curl -X POST "/api/v1/auth/verify" \\
+     -H "Content-Type: application/json" \\
+     -d '{"wallet_address": "0x...", "signature": "0x...", "protocol": "evm"}'
+```
+        """,
         version=settings.APP_VERSION,
         docs_url="/",
-        redoc_url="/redoc"
+        redoc_url="/redoc",
+        contact={
+            "name": "MintroAI Team",
+            "url": "https://mintroai.com",
+            "email": "support@mintroai.com"
+        },
+        license_info={
+            "name": "MIT License",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        servers=[
+            {
+                "url": "http://localhost:8000",
+                "description": "Development server"
+            },
+            {
+                "url": "https://api.mintroai.com",
+                "description": "Production server"
+            }
+        ]
     )
 
     # CORS middleware
