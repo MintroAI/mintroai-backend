@@ -12,6 +12,7 @@ import uuid
 
 from src.core.logger.logger import get_logger
 from src.infra.config.redis import get_redis
+from src.api.utils.metrics import get_metrics
 
 logger = get_logger(__name__)
 
@@ -179,6 +180,29 @@ class AuditLogger:
             return 'CLIENT_ERROR'
         
         return 'API_REQUEST'
+    
+    def _update_metrics(self, event: AuditEvent):
+        """Update metrics based on audit event."""
+        try:
+            metrics = get_metrics()
+            
+            # Record challenge creation
+            if event.event_type == 'CHALLENGE_REQUEST':
+                metrics.record_challenge_created(event.protocol or 'unknown')
+            
+            # Record authentication attempts
+            elif event.event_type in ['AUTH_SUCCESS', 'AUTH_FAILED']:
+                success = event.event_type == 'AUTH_SUCCESS'
+                metrics.record_auth_attempt(event.protocol or 'unknown', success)
+            
+            # Record session changes
+            elif event.event_type == 'AUTH_SUCCESS':
+                metrics.record_session_change(1)  # Login
+            elif event.event_type == 'LOGOUT':
+                metrics.record_session_change(-1)  # Logout
+                
+        except Exception as e:
+            logger.warning(f"Failed to update metrics: {str(e)}")
 
 
 class AuditLoggingMiddleware(BaseHTTPMiddleware):
@@ -285,6 +309,8 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         # Log audit event asynchronously
         try:
             await self.audit_logger.log_event(audit_event)
+            # Update metrics
+            self.audit_logger._update_metrics(audit_event)
         except Exception as e:
             logger.error(f"Failed to process audit event: {str(e)}")
         
