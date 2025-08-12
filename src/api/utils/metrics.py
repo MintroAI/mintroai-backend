@@ -1,6 +1,17 @@
 """
 Simple metrics collection for authentication operations.
 Lightweight alternative to Prometheus for MVP.
+
+TODO: For production deployment with multiple instances, consider migrating 
+to Redis-based metrics storage to ensure data persistence and consistency 
+across instances. Current in-memory approach will lose data on restart 
+and won't scale across multiple server instances.
+
+Recommended Redis-based approach:
+- Use Redis INCR for counters (auth_success_count, auth_failure_count)
+- Use Redis ZADD with timestamps for time-series data
+- Use Redis EXPIRE for automatic cleanup of old data
+- Use Redis HASH for structured metrics data
 """
 
 from typing import Dict, Any
@@ -14,7 +25,13 @@ logger = get_logger(__name__)
 
 
 class SimpleMetrics:
-    """Simple in-memory metrics collector for authentication operations."""
+    """
+    Simple in-memory metrics collector for authentication operations.
+    
+    WARNING: This implementation stores metrics in memory and will not scale 
+    across multiple instances. Data will be lost on application restart.
+    For production use with multiple instances, migrate to Redis backend.
+    """
     
     def __init__(self, retention_hours: int = 24):
         self._lock = threading.Lock()

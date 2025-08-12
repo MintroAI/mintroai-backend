@@ -53,12 +53,12 @@ class AddressValidator:
         if re.match(r'^[0-9a-f]{64}$', address):
             return True
         
-        # Named account
-        if re.match(r'^[a-z0-9_-]+\.(near|testnet)$', address):
+        # Named account (subaccounts with dots)
+        if re.match(r'^[a-z0-9]+([a-z0-9\-_]*[a-z0-9])?\.(near|testnet)$', address):
             return True
         
-        # Top-level account (for testnet)
-        if re.match(r'^[a-z0-9_-]+$', address) and len(address) >= 2 and len(address) <= 64:
+        # Top-level account (more strict - no underscores or hyphens for top-level)
+        if re.match(r'^[a-z0-9]+$', address) and len(address) >= 2 and len(address) <= 64:
             return True
         
         return False

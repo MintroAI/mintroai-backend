@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     SUSPICIOUS_IP_THRESHOLD: int = 5  # failed attempts before blocking
     IP_BLOCK_DURATION: int = 15  # minutes
     
+    # Endpoint-specific rate limits (requests per minute)
+    RATE_LIMIT_AUTH_CHALLENGE: int = 5  # Challenge creation
+    RATE_LIMIT_AUTH_VERIFY: int = 3     # Signature verification  
+    RATE_LIMIT_AUTH_REFRESH: int = 10   # Token refresh
+    RATE_LIMIT_AUTH_LOGOUT: int = 20    # Logout requests
+    RATE_LIMIT_DEFAULT: int = 30        # Default for other endpoints
+    
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",  # Frontend development

@@ -29,6 +29,28 @@ from src.infra.config.settings import get_settings
 from src.core.logger.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _build_error_response(error_code: str, message: str, details: str = None) -> Dict[str, Any]:
+    """
+    Helper function to create standardized error responses.
+    
+    Args:
+        error_code: Standard error code from ErrorCode enum
+        message: Human-readable error message
+        details: Optional additional error details
+    
+    Returns:
+        Standardized error response dictionary
+    """
+    return {
+        "error": {
+            "code": error_code,
+            "message": message,
+            "details": details,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    }
 settings = get_settings()
 router = APIRouter(
     prefix="/auth", 
@@ -182,26 +204,20 @@ async def create_challenge(
         logger.warning(f"Invalid challenge request: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail={
-                    "error": {
-                        "code": ErrorCode.INVALID_INPUT.value,
-                        "message": str(e),
-                        "timestamp": datetime.utcnow().isoformat() + "Z"
-                    }
-                }
+            detail=_build_error_response(
+                ErrorCode.INVALID_INPUT.value,
+                str(e)
+            )
         )
         
     except Exception as e:
         logger.error(f"Failed to create challenge: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": {
-                    "code": ErrorCode.INTERNAL_ERROR.value,
-                    "message": "Failed to create challenge",
-                    "timestamp": datetime.utcnow().isoformat() + "Z"
-                }
-            }
+            detail=_build_error_response(
+                ErrorCode.INTERNAL_ERROR.value,
+                "Failed to create challenge"
+            )
         )
 
 
@@ -247,13 +263,10 @@ async def verify_challenge(
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={
-                    "error": {
-                        "code": ErrorCode.INVALID_SIGNATURE,
-                        "message": f"Invalid signature: {error}",
-                        "timestamp": datetime.utcnow().isoformat() + "Z"
-                    }
-                }
+                detail=_build_error_response(
+                    ErrorCode.INVALID_SIGNATURE.value,
+                    f"Invalid signature: {error}"
+                )
             )
         
         # Generate tokens

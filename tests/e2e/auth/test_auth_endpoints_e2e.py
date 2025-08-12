@@ -20,26 +20,24 @@ class TestAuthenticationE2E:
         """Create test client with protocols initialized."""
         app = create_app()
         
-        # Initialize protocols synchronously for testing
-        import asyncio
-        from src.api.controller.auth.auth_controller import init_protocols
-        
-        async def init_for_test():
-            try:
-                await init_protocols()
-                print("Protocols initialized successfully")
-            except Exception as e:
-                print(f"Warning: Protocol initialization failed: {e}")
-        
-        # Run initialization
+        # Initialize protocols for testing
+        # Note: We use a simple approach since TestClient handles sync/async internally
         try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        if not loop.is_running():
-            loop.run_until_complete(init_for_test())
+            # Try to initialize protocols if possible
+            # This will work in most test scenarios
+            import asyncio
+            from src.api.controller.auth.auth_controller import init_protocols
+            
+            # Use asyncio.run for clean event loop management
+            try:
+                asyncio.run(init_protocols())
+                print("Protocols initialized successfully")
+            except RuntimeError as e:
+                # If we're already in an event loop, skip initialization
+                # The protocols will be initialized on first request
+                print(f"Skipping protocol initialization: {e}")
+        except Exception as e:
+            print(f"Warning: Protocol initialization failed: {e}")
         
         return TestClient(app)
     
