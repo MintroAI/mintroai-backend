@@ -14,6 +14,9 @@ from src.core.logger.logger import get_logger
 from src.infra.config.redis import get_redis
 from src.api.utils.metrics import get_metrics
 
+# Maximum size for request body audit logging (1MB)
+MAX_AUDIT_LOG_BODY_SIZE = 1024 * 1024
+
 logger = get_logger(__name__)
 
 
@@ -232,11 +235,24 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         start_time = datetime.utcnow()
         event_id = str(uuid.uuid4())
         
-        # Read request body for audit logging
+        # Read request body for audit logging with size limit
         body = b""
+        audit_body = b""
+        truncated = False
+        
         if request.method in ["POST", "PUT", "PATCH"]:
             try:
-                body = await request.body()
+                full_body = await request.body()
+                body = full_body
+                
+                # Limit audit body size for performance
+                if len(full_body) > MAX_AUDIT_LOG_BODY_SIZE:
+                    audit_body = full_body[:MAX_AUDIT_LOG_BODY_SIZE]
+                    truncated = True
+                    logger.warning(f"Request body truncated for audit logging. Original size: {len(full_body)} bytes")
+                else:
+                    audit_body = full_body
+                
                 # Recreate request with body for downstream processing
                 async def receive():
                     return {"type": "http.request", "body": body}
@@ -263,11 +279,14 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         error_code = None
         error_message = None
         
-        if request.url.path.startswith('/auth/') and body:
+        if request.url.path.startswith('/auth/') and audit_body:
             try:
-                body_data = json.loads(body.decode('utf-8'))
+                body_data = json.loads(audit_body.decode('utf-8'))
                 wallet_address = body_data.get('wallet_address')
                 protocol = body_data.get('protocol')
+                if truncated:
+                    # Add indicator that body was truncated
+                    body_data['_audit_truncated'] = True
             except Exception:
                 pass
         

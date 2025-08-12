@@ -21,13 +21,14 @@ class RateLimiter:
         self.blocked_ips: Dict[str, datetime] = {}  # IP -> Unblock time
         self.failed_attempts: Dict[str, Tuple[int, datetime]] = {}  # IP -> (count, first_attempt)
         
-        # Endpoint-specific rate limits (requests per minute)
+        # Endpoint-specific rate limits (requests per minute) - configurable via settings
+        settings_instance = get_settings()
         self.endpoint_limits = {
-            '/auth/challenge': 5,  # 5 challenges per minute
-            '/auth/verify': 3,     # 3 verify attempts per minute
-            '/auth/refresh': 10,   # 10 refresh attempts per minute
-            '/auth/logout': 20,    # 20 logout attempts per minute
-            'default': 30          # Default limit for other endpoints
+            '/auth/challenge': settings_instance.RATE_LIMIT_AUTH_CHALLENGE,
+            '/auth/verify': settings_instance.RATE_LIMIT_AUTH_VERIFY,
+            '/auth/refresh': settings_instance.RATE_LIMIT_AUTH_REFRESH,
+            '/auth/logout': settings_instance.RATE_LIMIT_AUTH_LOGOUT,
+            'default': settings_instance.RATE_LIMIT_DEFAULT
         }
 
     def is_rate_limited(self, ip: str, endpoint: str) -> Tuple[bool, int, int, Optional[datetime]]:
