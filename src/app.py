@@ -7,6 +7,7 @@ from src.infra.config.settings import settings
 from src.core.logger.logger import logger
 from src.api.router import health, protected, mock_endpoint, auth
 from src.api.middleware.security.rate_limiter import RateLimitMiddleware
+from src.api.middleware.security.audit_logger import AuditLoggingMiddleware
 from src.api.middleware.logging.request_logging import RequestLoggingMiddleware
 
 def create_app() -> FastAPI:
@@ -31,6 +32,9 @@ def create_app() -> FastAPI:
 
     # Request logging middleware (should be first to catch all requests)
     app.add_middleware(RequestLoggingMiddleware)
+
+    # Audit logging middleware
+    app.add_middleware(AuditLoggingMiddleware)
 
     # Rate limiting middleware
     app.add_middleware(RateLimitMiddleware)

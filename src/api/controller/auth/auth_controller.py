@@ -75,8 +75,8 @@ async def get_challenge_service() -> ChallengeService:
     redis_client = await get_redis()
     challenge_store = ChallengeStore(redis_client)
     
-    # Initialize multi-protocol signature service
-    multi_signature_service = MultiProtocolSignatureService(protocol_registry)
+    # Initialize multi-protocol signature service (no constructor args needed)
+    multi_signature_service = MultiProtocolSignatureService()
     
     return ChallengeService(challenge_store, multi_signature_service)
 
@@ -426,7 +426,7 @@ async def get_supported_protocols():
         from src.api.controller.auth.dto.output_dto import ProtocolInfo
         
         protocols = []
-        for verifier in protocol_registry.verifiers.values():
+        for verifier in protocol_registry._verifiers.values():
             # Determine features based on protocol
             features = ["challenge_response", "signature_verification"]
             if verifier.config.protocol == BlockchainProtocol.NEAR:
@@ -448,7 +448,7 @@ async def get_supported_protocols():
                 enabled=True,
                 network=network,
                 chain_id=chain_id,
-                rpc_status="connected" if verifier._connection_established else "offline",
+                rpc_status="connected" if getattr(verifier, '_connection_established', True) else "offline",
                 features=features
             )
             protocols.append(protocol_info)
