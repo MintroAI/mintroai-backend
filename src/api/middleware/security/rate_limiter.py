@@ -12,8 +12,8 @@ from src.api.controller.auth.dto.error_responses import RateLimitErrorResponse, 
 logger = get_logger(__name__)
 settings = get_settings()
 
-class EnhancedRateLimiter:
-    """Enhanced rate limiter with endpoint-specific limits and detailed tracking."""
+class RateLimiter:
+    """Rate limiter with endpoint-specific limits and detailed tracking."""
     
     def __init__(self):
         # Endpoint-specific request tracking: endpoint -> IP -> timestamps
@@ -103,12 +103,12 @@ class EnhancedRateLimiter:
         self.blocked_ips[ip] = datetime.utcnow() + block_duration
         logger.warning(f"IP {ip} has been blocked for {block_duration_minutes} minutes due to suspicious activity")
 
-class EnhancedRateLimitMiddleware(BaseHTTPMiddleware):
-    """Enhanced rate limiting middleware with endpoint-specific limits and detailed error responses."""
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Rate limiting middleware with endpoint-specific limits and detailed error responses."""
     
     def __init__(self, app):
         super().__init__(app)
-        self.rate_limiter = EnhancedRateLimiter()
+        self.rate_limiter = RateLimiter()
 
     def _get_client_ip(self, request: Request) -> str:
         """Get client IP, handling proxies."""
