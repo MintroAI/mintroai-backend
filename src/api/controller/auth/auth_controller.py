@@ -11,7 +11,7 @@ from src.api.controller.auth.dto.input_dto import (
 )
 from src.api.controller.auth.dto.output_dto import (
     ChallengeResponseDto, AuthResponseDto, TokenRefreshResponseDto, 
-    LogoutResponseDto, SessionStatusResponseDto
+    LogoutResponseDto, SessionStatusResponseDto, ProtocolsResponseDto, AccountInfoResponseDto
 )
 from src.api.controller.auth.dto.error_responses import ErrorCode, ErrorDetail, ErrorResponse
 from src.api.utils.validators import RequestValidator, ValidationException, validation_exception_handler
@@ -412,4 +412,149 @@ async def get_session_status(
             protocol=None,
             expires_at=None,
             remaining_seconds=None
+        )
+
+
+@router.get("/protocols", response_model=ProtocolsResponseDto)
+async def get_supported_protocols():
+    """
+    Get list of supported blockchain protocols and their detailed status.
+    
+    Returns information about each protocol including network, RPC status, and features.
+    """
+    try:
+        from src.api.controller.auth.dto.output_dto import ProtocolInfo
+        
+        protocols = []
+        for verifier in protocol_registry.verifiers.values():
+            # Determine features based on protocol
+            features = ["challenge_response", "signature_verification"]
+            if verifier.config.protocol == BlockchainProtocol.NEAR:
+                features.extend(["ed25519_signatures", "implicit_accounts", "named_accounts"])
+            elif verifier.config.protocol == BlockchainProtocol.EVM:
+                features.extend(["ecdsa_signatures", "ethereum_compatible"])
+            
+            # Get network information
+            network = None
+            chain_id = None
+            if hasattr(verifier.config, 'network_id'):
+                network = verifier.config.network_id
+            elif hasattr(verifier.config, 'chain_id'):
+                chain_id = verifier.config.chain_id
+                network = "mainnet" if chain_id == 1 else f"chain_{chain_id}"
+            
+            protocol_info = ProtocolInfo(
+                name=verifier.config.protocol.value,
+                enabled=True,
+                network=network,
+                chain_id=chain_id,
+                rpc_status="connected" if verifier._connection_established else "offline",
+                features=features
+            )
+            protocols.append(protocol_info)
+        
+        enabled_count = len([p for p in protocols if p.enabled])
+        
+        logger.info(f"Retrieved {len(protocols)} protocols, {enabled_count} enabled")
+        
+        return ProtocolsResponseDto(
+            protocols=protocols,
+            total_count=len(protocols),
+            enabled_count=enabled_count
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get protocols: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": {
+                    "code": ErrorCode.INTERNAL_ERROR,
+                    "message": "Failed to retrieve protocols",
+                    "timestamp": datetime.utcnow().isoformat() + "Z"
+                }
+            }
+        )
+
+
+@router.get("/account/{protocol}/{address}", response_model=AccountInfoResponseDto)
+async def get_account_info(
+    protocol: str,
+    address: str
+):
+    """
+    Get account information for a specific protocol and address.
+    
+    Validates the address format and returns basic account information.
+    For production, this could be extended to fetch balance and other details.
+    """
+    try:
+        # Validate protocol
+        protocol_enum = RequestValidator.validate_protocol(protocol)
+        
+        # Validate address for the protocol
+        validated_address = RequestValidator.validate_wallet_address(address, protocol_enum)
+        
+        # Get verifier for the protocol
+        verifier = protocol_registry.get_verifier(protocol_enum)
+        if not verifier:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": {
+                        "code": ErrorCode.UNSUPPORTED_PROTOCOL,
+                        "message": f"Protocol {protocol} is not registered",
+                        "timestamp": datetime.utcnow().isoformat() + "Z"
+                    }
+                }
+            )
+        
+        # Determine account type based on protocol and address format
+        account_type = None
+        network = None
+        
+        if protocol_enum == BlockchainProtocol.NEAR:
+            network = getattr(verifier.config, 'network_id', 'unknown')
+            if len(validated_address) == 64 and all(c in '0123456789abcdef' for c in validated_address.lower()):
+                account_type = "implicit"
+            elif '.' in validated_address:
+                account_type = "named"
+            else:
+                account_type = "top_level"
+                
+        elif protocol_enum == BlockchainProtocol.EVM:
+            account_type = "externally_owned"  # Could be contract, but we can't determine without RPC
+            chain_id = getattr(verifier.config, 'chain_id', None)
+            network = "mainnet" if chain_id == 1 else f"chain_{chain_id}" if chain_id else "unknown"
+        
+        logger.info(f"Retrieved account info for {validated_address} on {protocol}")
+        
+        return AccountInfoResponseDto(
+            address=validated_address,
+            protocol=protocol_enum.value,
+            valid=True,
+            network=network,
+            account_type=account_type,
+            balance=None,  # Would require RPC calls - skip for MVP
+            last_activity=None  # Would require RPC calls - skip for MVP
+        )
+        
+    except ValidationException as e:
+        logger.warning(f"Validation failed for account info request: {e}")
+        validation_exception_handler(None, e)
+        
+    except HTTPException:
+        raise
+        
+    except Exception as e:
+        logger.error(f"Failed to get account info: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": {
+                    "code": ErrorCode.INTERNAL_ERROR,
+                    "message": "Failed to retrieve account information",
+                    "timestamp": datetime.utcnow().isoformat() + "Z"
+                }
+            }
         )
