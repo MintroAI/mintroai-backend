@@ -74,25 +74,26 @@ async def init_protocols():
         await evm_verifier.initialize()
         protocol_registry.register(evm_verifier)
         
-        # Register NEAR verifier if enabled
+        # Register NEAR verifier if enabled (try RPC first for payment functionality)
         if settings.NEAR_ENABLED:
             try:
+                logger.info("Attempting NEAR RPC initialization for payment functionality...")
                 near_verifier = create_near_verifier(
                     network_id=settings.NEAR_NETWORK_ID,
                     rpc_urls=settings.NEAR_RPC_URLS
                 )
                 await near_verifier.initialize()
                 protocol_registry.register(near_verifier)
-                logger.info("NEAR verifier registered successfully")
+                logger.info("NEAR verifier registered successfully with RPC connection")
             except Exception as near_error:
-                logger.warning(f"NEAR verifier initialization failed, registering without RPC: {str(near_error)}")
-                # Register NEAR verifier without initialization for testing
+                logger.warning(f"NEAR RPC initialization failed, registering in offline mode: {str(near_error)}")
+                # Register NEAR verifier without RPC initialization for basic auth
                 near_verifier = create_near_verifier(
                     network_id=settings.NEAR_NETWORK_ID,
                     rpc_urls=settings.NEAR_RPC_URLS
                 )
                 protocol_registry.register(near_verifier)
-                logger.info("NEAR verifier registered in offline mode")
+                logger.info("NEAR verifier registered in offline mode (limited functionality)")
         
         logger.info(f"Initialized {len(protocol_registry._verifiers)} protocol verifiers")
         
@@ -587,14 +588,26 @@ async def get_account_info(
         
         logger.info(f"Retrieved account info for {validated_address} on {protocol}")
         
+        # Get detailed account info using RPC if available
+        balance = None
+        last_activity = None
+        
+        try:
+            account_info = await verifier.get_account_info(validated_address)
+            if account_info:
+                balance = account_info.get("balance")
+                # last_activity would need additional RPC calls - skip for now
+        except Exception as rpc_error:
+            logger.debug(f"Failed to get RPC account info: {rpc_error}")
+        
         return AccountInfoResponseDto(
             address=validated_address,
             protocol=protocol_enum.value,
             valid=True,
             network=network,
             account_type=account_type,
-            balance=None,  # Would require RPC calls - skip for MVP
-            last_activity=None  # Would require RPC calls - skip for MVP
+            balance=balance,
+            last_activity=last_activity
         )
         
     except ValidationException as e:

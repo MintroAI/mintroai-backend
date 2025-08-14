@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaMask Auth Test - MintroAI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #4CAF50;
+            background-color: #f9f9f9;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .error {
+            background-color: #ffe8e8;
+            color: #cc0000;
+        }
+        .info {
+            background-color: #e8f4fd;
+            color: #0066cc;
+        }
+        .wallet-info {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦊 MetaMask Authentication Test</h1>
+        <p>Bu sayfa MintroAI backend'inin MetaMask ile authentication sürecini test eder.</p>
+        
+        <div class="wallet-info">
+            <h3>💼 Wallet Durumu:</h3>
+            <div id="walletStatus">MetaMask kontrol ediliyor...</div>
+            <button class="button" onclick="manualCheck()" style="margin-top: 10px;">🔄 Manual Check</button>
+        </div>
+
+        <div class="step">
+            <h3>📝 Step 1: Connect Wallet</h3>
+            <button class="button" id="connectBtn" onclick="connectWallet()">Connect MetaMask</button>
+            <div id="connectResult"></div>
+        </div>
+
+        <div class="step">
+            <h3>🎲 Step 2: Request Challenge</h3>
+            <button class="button" id="challengeBtn" onclick="requestChallenge()" disabled>Get Challenge</button>
+            <div id="challengeResult"></div>
+        </div>
+
+        <div class="step">
+            <h3>✍️ Step 3: Sign Message</h3>
+            <button class="button" id="signBtn" onclick="signMessage()" disabled>Sign with MetaMask</button>
+            <div id="signResult"></div>
+        </div>
+
+        <div class="step">
+            <h3>🔐 Step 4: Verify & Authenticate</h3>
+            <button class="button" id="verifyBtn" onclick="verifySignature()" disabled>Verify & Login</button>
+            <div id="verifyResult"></div>
+        </div>
+
+        <div class="step">
+            <h3>👤 Step 5: Account Info</h3>
+            <button class="button" id="accountBtn" onclick="getAccountInfo()" disabled>Get Account Info</button>
+            <div id="accountResult"></div>
+        </div>
+
+        <div class="step">
+            <h3>🚪 Step 6: Logout</h3>
+            <button class="button" id="logoutBtn" onclick="logout()" disabled>Logout & Invalidate Token</button>
+            <div id="logoutResult"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api/v1/auth';
+        let currentAccount = null;
+        let challengeData = null;
+        let signatureData = null;
+        let authToken = null;
+
+        // Check MetaMask availability with multiple detection methods
+        async function checkMetaMask() {
+            let attempts = 0;
+            const maxAttempts = 50; // Increased attempts
+            
+            document.getElementById('walletStatus').innerHTML = '🔍 Searching for MetaMask...';
+            
+            while (attempts < maxAttempts) {
+                // Method 1: Standard window.ethereum
+                if (typeof window.ethereum !== 'undefined') {
+                    return await initializeMetaMask();
+                }
+                
+                // Method 2: Check for MetaMask specifically
+                if (window.ethereum && window.ethereum.isMetaMask) {
+                    return await initializeMetaMask();
+                }
+                
+                // Method 3: Check for multiple providers
+                if (window.ethereum && window.ethereum.providers) {
+                    const metamaskProvider = window.ethereum.providers.find(p => p.isMetaMask);
+                    if (metamaskProvider) {
+                        window.ethereum = metamaskProvider;
+                        return await initializeMetaMask();
+                    }
+                }
+                
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 200)); // Increased delay
+            }
+            
+            // Show debug info
+            document.getElementById('walletStatus').innerHTML = 
+                `❌ MetaMask not found!<br>
+                Debug info:<br>
+                - window.ethereum: ${typeof window.ethereum}<br>
+                - window.web3: ${typeof window.web3}<br>
+                - User Agent: ${navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Other'}<br>
+                <br>
+                Solutions:<br>
+                1. Make sure MetaMask extension is enabled<br>
+                2. Try refreshing the page<br>
+                3. Try opening in a new tab<br>
+                4. Check if other extensions are blocking MetaMask`;
+        }
+        
+        async function initializeMetaMask() {
+            try {
+                document.getElementById('walletStatus').innerHTML = '✅ MetaMask detected!';
+                
+                // Check if already connected
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    currentAccount = accounts[0];
+                    updateWalletStatus();
+                    document.getElementById('challengeBtn').disabled = false;
+                }
+                
+                // Listen for account changes
+                window.ethereum.on('accountsChanged', (accounts) => {
+                    if (accounts.length > 0) {
+                        currentAccount = accounts[0];
+                        updateWalletStatus();
+                    } else {
+                        currentAccount = null;
+                        document.getElementById('walletStatus').innerHTML = '✅ MetaMask detected! (Not connected)';
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Error initializing MetaMask:', error);
+                document.getElementById('walletStatus').innerHTML = 
+                    `⚠️ MetaMask found but error occurred: ${error.message}`;
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', checkMetaMask);
+        
+        // Also check when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkMetaMask);
+        } else {
+            checkMetaMask();
+        }
+        
+        // Manual check function
+        function manualCheck() {
+            document.getElementById('walletStatus').innerHTML = '🔍 Manual check starting...';
+            
+            console.log('=== MetaMask Debug Info ===');
+            console.log('window.ethereum:', window.ethereum);
+            console.log('typeof window.ethereum:', typeof window.ethereum);
+            console.log('window.ethereum.isMetaMask:', window.ethereum?.isMetaMask);
+            console.log('window.web3:', window.web3);
+            console.log('navigator.userAgent:', navigator.userAgent);
+            
+            setTimeout(() => {
+                checkMetaMask();
+            }, 100);
+        }
+
+        function updateWalletStatus() {
+            if (currentAccount) {
+                document.getElementById('walletStatus').innerHTML = 
+                    `✅ Connected: <strong>${currentAccount}</strong>`;
+            }
+        }
+
+        async function connectWallet() {
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    throw new Error('MetaMask is not installed!');
+                }
+                
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                currentAccount = accounts[0];
+                updateWalletStatus();
+                
+                document.getElementById('connectResult').innerHTML = 
+                    `<div class="result">Connected to: ${currentAccount}</div>`;
+                
+                document.getElementById('challengeBtn').disabled = false;
+                document.getElementById('connectBtn').textContent = 'Connected ✅';
+                document.getElementById('connectBtn').disabled = true;
+                
+            } catch (error) {
+                document.getElementById('connectResult').innerHTML = 
+                    `<div class="result error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function requestChallenge() {
+            try {
+                const response = await fetch(`${API_BASE}/challenge`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        protocol: 'evm',
+                        wallet_address: currentAccount
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    challengeData = data;
+                    document.getElementById('challengeResult').innerHTML = 
+                        `<div class="result">Challenge received:\nNonce: ${data.nonce}\nMessage: ${data.message}</div>`;
+                    
+                    document.getElementById('signBtn').disabled = false;
+                } else {
+                    throw new Error(data.detail || 'Challenge request failed');
+                }
+                
+            } catch (error) {
+                document.getElementById('challengeResult').innerHTML = 
+                    `<div class="result error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function signMessage() {
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    throw new Error('MetaMask is not installed!');
+                }
+                
+                const signature = await window.ethereum.request({
+                    method: 'personal_sign',
+                    params: [challengeData.message, currentAccount]
+                });
+
+                signatureData = {
+                    signature: signature,
+                    message: challengeData.message,
+                    address: currentAccount
+                };
+
+                document.getElementById('signResult').innerHTML = 
+                    `<div class="result">Message signed successfully!\nSignature: ${signature.substring(0, 20)}...</div>`;
+                
+                document.getElementById('verifyBtn').disabled = false;
+                
+            } catch (error) {
+                document.getElementById('signResult').innerHTML = 
+                    `<div class="result error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function verifySignature() {
+            try {
+                const response = await fetch(`${API_BASE}/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        protocol: 'evm',
+                        wallet_address: currentAccount,
+                        signature: signatureData.signature,
+                        nonce: challengeData.nonce
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.access_token;
+                    document.getElementById('verifyResult').innerHTML = 
+                        `<div class="result">🎉 Authentication successful!\nAccess Token: ${data.access_token.substring(0, 30)}...\nExpires: ${data.expires_at}</div>`;
+                    
+                    document.getElementById('accountBtn').disabled = false;
+                    document.getElementById('logoutBtn').disabled = false;
+                } else {
+                    throw new Error(data.detail || 'Verification failed');
+                }
+                
+            } catch (error) {
+                document.getElementById('verifyResult').innerHTML = 
+                    `<div class="result error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function getAccountInfo() {
+            try {
+                const response = await fetch(`${API_BASE}/account/evm/${currentAccount}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('accountResult').innerHTML = 
+                        `<div class="result">Account Info:\n${JSON.stringify(data, null, 2)}</div>`;
+                } else {
+                    throw new Error(data.detail || 'Account info request failed');
+                }
+                
+            } catch (error) {
+                document.getElementById('accountResult').innerHTML = 
+                    `<div class="result error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch(`${API_BASE}/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        wallet_address: currentAccount,
+                        protocol: 'evm'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Clear local data
+                    authToken = null;
+                    challengeData = null;
+                    signatureData = null;
+                    
+                    // Reset UI
+                    document.getElementById('logoutResult').innerHTML = 
+                        `<div class="result">🚪 Logout successful!\nToken invalidated: ${data.message || 'Session terminated'}</div>`;
+                    
+                    // Disable buttons that require authentication
+                    document.getElementById('accountBtn').disabled = true;
+                    document.getElementById('logoutBtn').disabled = true;
+                    document.getElementById('challengeBtn').disabled = false; // Allow new auth flow
+                    document.getElementById('signBtn').disabled = true;
+                    document.getElementById('verifyBtn').disabled = true;
+                    
+                    // Clear previous results
+                    document.getElementById('challengeResult').innerHTML = '';
+                    document.getElementById('signResult').innerHTML = '';
+                    document.getElementById('verifyResult').innerHTML = '';
+                    document.getElementById('accountResult').innerHTML = '';
+                    
+                } else {
+                    throw new Error(data.detail || 'Logout failed');
+                }
+                
+            } catch (error) {
+                document.getElementById('logoutResult').innerHTML = 
+                    `<div class="result error">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

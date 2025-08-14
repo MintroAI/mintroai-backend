@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",  # Frontend development
-        "https://app.mintroai.com"  # Production frontend
+        "https://app.mintroai.com",  # Production frontend
+        "file://*",  # Local HTML files for testing
+        "null"  # For file:// protocol
     ]
 
     # Redis Settings
@@ -58,10 +60,10 @@ class Settings(BaseSettings):
     DEFAULT_PROTOCOL: str = "evm"
     
     # NEAR Protocol Settings
-    NEAR_NETWORK_ID: str = "testnet"  # testnet or mainnet
+    NEAR_NETWORK_ID: str = "mainnet"  # testnet or mainnet
     NEAR_RPC_URLS: List[str] = [
-        "https://rpc.testnet.near.org",
-        "https://test.rpc.fastnear.com"
+        "https://rpc.mainnet.near.org",
+        "https://rpc.fastnear.com"
     ]
     NEAR_MAX_RETRIES: int = 3
     NEAR_TIMEOUT_SECONDS: int = 30
