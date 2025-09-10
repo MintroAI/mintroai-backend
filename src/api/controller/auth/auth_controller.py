@@ -238,13 +238,28 @@ async def verify_challenge(
         # Enhanced validation
         protocol = RequestValidator.validate_protocol(request.protocol.value)
         wallet_address = RequestValidator.validate_wallet_address(request.wallet_address, protocol)
-        signature = RequestValidator.validate_signature(request.signature, protocol)
+        
+        # Handle signature validation based on protocol and format
+        signature = request.signature
+        if protocol == BlockchainProtocol.NEAR:
+            # For NEAR, signature can be string or NEARSignatureDto object
+            if hasattr(signature, 'dict'):  # NEARSignatureDto object
+                signature = signature.dict()
+        else:
+            # For EVM, validate as string
+            signature = RequestValidator.validate_signature(signature, protocol)
+        
         public_key = RequestValidator.validate_public_key(request.public_key, protocol)
         
         # Prepare protocol-specific kwargs
         verify_kwargs = {}
-        if protocol == BlockchainProtocol.NEAR and public_key:
-            verify_kwargs['public_key'] = public_key
+        if protocol == BlockchainProtocol.NEAR:
+            if public_key:
+                verify_kwargs['public_key'] = public_key
+            if hasattr(request, 'nonce') and request.nonce:
+                verify_kwargs['nonce'] = request.nonce
+            if hasattr(request, 'recipient') and request.recipient:
+                verify_kwargs['recipient'] = request.recipient
         
         # Verify challenge
         is_valid, error = await challenge_service.verify_challenge(
