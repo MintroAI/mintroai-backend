@@ -1,0 +1,3 @@
+"""
+Chat controller module
+"""

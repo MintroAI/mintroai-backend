@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.infra.config.settings import settings
 from src.core.logger.logger import logger
-from src.api.router import health, protected, mock_endpoint, auth
+from src.api.router import health, protected, mock_endpoint, auth, chat
 from src.api.middleware.security.rate_limiter import RateLimitMiddleware
 from src.api.middleware.security.audit_logger import AuditLoggingMiddleware
 from src.api.middleware.logging.request_logging import RequestLoggingMiddleware
@@ -97,6 +97,7 @@ curl -X POST "/api/v1/auth/verify" \\
     # Include routers
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(chat.router, prefix="/api/v1")
     app.include_router(protected.router, prefix="/api/v1")
     app.include_router(mock_endpoint.router, prefix="/api/v1")
 
@@ -115,6 +116,13 @@ curl -X POST "/api/v1/auth/verify" \\
             await init_protocols()
         except Exception as e:
             logger.error(f"Failed to initialize protocols on startup: {str(e)}")
+        
+        # Initialize chat services
+        try:
+            from src.api.controller.chat.chat_controller import init_chat_services
+            await init_chat_services()
+        except Exception as e:
+            logger.error(f"Failed to initialize chat services on startup: {str(e)}")
 
     @app.on_event("shutdown")
     async def shutdown_event():
