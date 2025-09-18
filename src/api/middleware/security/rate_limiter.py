@@ -180,8 +180,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return response
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        # Skip rate limiting for CORS preflight requests and health checks
-        if request.method == "OPTIONS" or request.url.path in ["/health", "/docs", "/redoc"]:
+        # Skip rate limiting for CORS preflight requests, health checks, and chat endpoints
+        # Chat endpoints have their own specialized rate limiting
+        if (request.method == "OPTIONS" or 
+            request.url.path in ["/health", "/docs", "/redoc"] or
+            request.url.path.startswith("/api/v1/chat")):
             return await call_next(request)
 
         ip = self._get_client_ip(request)
