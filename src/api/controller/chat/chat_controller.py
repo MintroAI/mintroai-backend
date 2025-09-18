@@ -43,8 +43,7 @@ chat_logger = None
 async def get_jwt_service() -> JWTService:
     """Get JWT service with dependencies."""
     redis_client = await get_redis()
-    token_store = TokenStore(redis_client)
-    return JWTService(token_store)
+    return JWTService(redis_client)
 
 
 async def init_chat_services():
@@ -100,8 +99,8 @@ async def get_user_context(
         payload = await jwt_service.verify_token(token, TokenType.ACCESS)
         
         # Extract user information
-        wallet_address = payload.get('wallet_address')
-        wallet_type = payload.get('wallet_type', 'unknown')
+        wallet_address = payload.wallet_address
+        wallet_type = getattr(payload, 'wallet_type', 'unknown')
         
         # Determine user type (could be enhanced with database lookup)
         user_type = "authenticated"
@@ -119,11 +118,14 @@ async def get_user_context(
             f"Invalid JWT token in chat request: {str(e)}",
             extra={"error": str(e)}
         )
-        # Treat as guest if token is invalid
-        return UserContext(
-            wallet_address=None,
-            is_authenticated=False,
-            user_type="guest"
+        # If token is provided but invalid, return 401 instead of treating as guest
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": "Invalid or expired authentication token",
+                "code": 401,
+                "message": "Please login again to continue"
+            }
         )
 
 

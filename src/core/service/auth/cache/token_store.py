@@ -116,8 +116,11 @@ class TokenStore:
                 "Failed to check token blacklist",
                 extra={
                     "jti": jti,
-                    "error": str(e)
+                    "error": str(e),
+                    "error_type": type(e).__name__
                 }
             )
-            # If we can't check the blacklist, assume token is invalid
-            return True
+            # If we can't check the blacklist, assume token is valid (fail-open for availability)
+            # In production, you might want to fail-closed for security
+            logger.warning(f"Redis connection failed ({type(e).__name__}: {str(e)}), allowing token access (fail-open mode)")
+            return False
