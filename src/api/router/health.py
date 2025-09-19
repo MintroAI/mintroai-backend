@@ -5,6 +5,7 @@ from typing import Dict, Any
 
 from src.core.logger.logger import logger
 from src.core.service.auth.protocols.base import protocol_registry, BlockchainProtocol
+from src.core.service.funding.funding_service import FundingService
 from src.infra.config.redis import get_redis
 from src.api.controller.auth.dto.output_dto import HealthCheckResponseDto
 from src.api.utils.metrics import get_metrics
@@ -19,6 +20,51 @@ async def check_redis_health() -> Dict[str, str]:
         return {"status": "healthy", "message": "Connected"}
     except Exception as e:
         return {"status": "unhealthy", "message": f"Connection failed: {str(e)}"}
+
+
+async def check_funding_health() -> Dict[str, Any]:
+    """Check funding service health."""
+    try:
+        funding_service = FundingService()
+        
+        # Check if funding service is configured
+        if not funding_service.funder_account:
+            return {
+                "status": "not_configured",
+                "message": "Funding service not configured - missing private key"
+            }
+        
+        # Get funding status
+        status_response = await funding_service.get_funding_status()
+        
+        if status_response.configured:
+            # Count healthy networks
+            healthy_networks = 0
+            total_networks = len(status_response.balances) if status_response.balances else 0
+            
+            if status_response.balances:
+                for network_balance in status_response.balances.values():
+                    if network_balance.can_fund and not network_balance.error:
+                        healthy_networks += 1
+            
+            return {
+                "status": "healthy" if healthy_networks > 0 else "degraded",
+                "message": f"{healthy_networks}/{total_networks} networks operational",
+                "funder_address": status_response.funder_address,
+                "networks": total_networks,
+                "healthy_networks": healthy_networks
+            }
+        else:
+            return {
+                "status": "unhealthy",
+                "message": status_response.message or "Funding service not configured"
+            }
+            
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "message": f"Funding service check failed: {str(e)}"
+        }
 
 
 async def check_protocol_health() -> Dict[str, Dict[str, Any]]:
@@ -77,6 +123,9 @@ async def health_check(request: Request):
     # Check protocol health
     protocol_health = await check_protocol_health()
     
+    # Check funding service health
+    funding_health = await check_funding_health()
+    
     # Get metrics health
     metrics = get_metrics()
     metrics_health = metrics.get_health_metrics()
@@ -87,6 +136,7 @@ async def health_check(request: Request):
         "auth_protocols": "healthy" if all(
             p.get("status") in ["healthy", "degraded"] for p in protocol_health.values()
         ) else "unhealthy",
+        "funding": funding_health["status"],
         "metrics": metrics_health["status"],
         "api_gateway": "healthy"
     }
