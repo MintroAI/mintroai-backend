@@ -172,9 +172,6 @@ class FundingService:
             # Wait for confirmation
             tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
             
-            # Note: WebSocket broadcast removed - funding service should not handle WebSocket directly
-            # If needed, this should be handled at the router level
-            
             return FundingResponse(
                 success=True,
                 funded=True,
