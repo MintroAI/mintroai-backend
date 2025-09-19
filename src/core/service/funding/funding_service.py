@@ -176,6 +176,7 @@ class FundingService:
                 success=True,
                 funded=True,
                 transactionHash=tx_hash.hex(),
+                blockNumber=tx_receipt.blockNumber,
                 amount=network_config['funding_amount'],
                 message="Address funded successfully"
             )
