@@ -1,6 +1,7 @@
 """Funding service for Chain Signatures."""
 
 import os
+import asyncio
 from typing import Dict, Optional
 from decimal import Decimal
 
@@ -32,6 +33,11 @@ class FundingService:
             "rpc_url": "https://testnet.aurora.dev",
             "funding_amount": "0.0025",  # in ETH
             "name": "Aurora Testnet"
+        },
+        "42161": {  # Arbitrum
+            "rpc_url": "https://arb1.arbitrum.io/rpc",
+            "funding_amount": "0.001",  # in ETH
+            "name": "Arbitrum"
         }
     }
     
@@ -167,10 +173,37 @@ class FundingService:
             # Wait for confirmation
             tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
             
+            # Broadcast funding event via WebSocket - exactly like Node.js
+            # broadcast({
+            #   type: 'addressFunded',
+            #   address,
+            #   chainId,
+            #   amount: networkConfig.fundingAmount,
+            #   txHash: tx.hash
+            # })
+            try:
+                from fastapi import FastAPI
+                from starlette.requests import Request
+                
+                # Get app instance to access WebSocket manager
+                # This will be passed from the router
+                if hasattr(request, '_app_state'):
+                    manager = request._app_state.ws_manager
+                    asyncio.create_task(manager.broadcast({
+                        "type": "addressFunded",
+                        "address": checksum_address,
+                        "chainId": request.chain_id,
+                        "amount": network_config['funding_amount'],
+                        "txHash": tx_hash.hex()
+                    }))
+            except Exception as e:
+                logger.warning(f"Failed to broadcast funding event: {e}")
+            
             return FundingResponse(
                 success=True,
                 funded=True,
                 transactionHash=tx_hash.hex(),
+                blockNumber=tx_receipt.blockNumber,
                 amount=network_config['funding_amount'],
                 message="Address funded successfully"
             )
@@ -178,21 +211,52 @@ class FundingService:
         except Exception as e:
             logger.error(f"Funding error: {e}")
             
-            # Handle specific error types
+            # Handle specific Web3 error types
             error_message = str(e)
-            if "insufficient funds" in error_message.lower():
+            error_type = type(e).__name__
+            
+            # Insufficient funds error
+            if "insufficient funds" in error_message.lower() or "insufficient balance" in error_message.lower():
                 return FundingResponse(
                     success=False,
                     funded=False,
-                    message="Funding failed",
-                    error="Insufficient funder balance"
+                    message="Funder wallet has insufficient balance",
+                    error="INSUFFICIENT_FUNDS"
                 )
             
+            # Network connection errors
+            if "connection" in error_message.lower() or "timeout" in error_message.lower() or "network" in error_message.lower():
+                return FundingResponse(
+                    success=False,
+                    funded=False,
+                    message="Network connection error. Please try again.",
+                    error="NETWORK_ERROR"
+                )
+            
+            # Gas estimation errors
+            if "gas" in error_message.lower() and ("estimate" in error_message.lower() or "limit" in error_message.lower()):
+                return FundingResponse(
+                    success=False,
+                    funded=False,
+                    message="Transaction gas estimation failed",
+                    error="GAS_ESTIMATION_ERROR"
+                )
+            
+            # Transaction failed errors
+            if "transaction" in error_message.lower() and ("failed" in error_message.lower() or "reverted" in error_message.lower()):
+                return FundingResponse(
+                    success=False,
+                    funded=False,
+                    message="Transaction failed on blockchain",
+                    error="TRANSACTION_FAILED"
+                )
+            
+            # Generic error
             return FundingResponse(
                 success=False,
                 funded=False,
-                message="Funding failed",
-                error=error_message
+                message="Failed to fund address",
+                error=f"UNKNOWN_ERROR: {error_type}"
             )
     
     async def check_balance(self, address: str, chain_id: str) -> BalanceResponse:

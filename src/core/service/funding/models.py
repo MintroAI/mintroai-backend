@@ -21,6 +21,7 @@ class FundingResponse(BaseModel):
     success: bool
     funded: bool
     transactionHash: Optional[str] = None  # Frontend expects camelCase
+    blockNumber: Optional[int] = None  # Block number if transaction was mined
     amount: str = "0"  # Amount funded or "0" if not funded
     message: str
     error: Optional[str] = None  # Error details if failed

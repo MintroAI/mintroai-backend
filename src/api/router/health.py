@@ -5,11 +5,14 @@ from typing import Dict, Any
 
 from src.core.logger.logger import logger
 from src.core.service.auth.protocols.base import protocol_registry, BlockchainProtocol
+from src.core.service.funding.funding_service import FundingService
 from src.infra.config.redis import get_redis
 from src.api.controller.auth.dto.output_dto import HealthCheckResponseDto
 from src.api.utils.metrics import get_metrics
 
 router = APIRouter()
+
+from src.infra.config.settings import settings
 
 async def check_redis_health() -> Dict[str, str]:
     """Check Redis connection health."""
@@ -19,6 +22,51 @@ async def check_redis_health() -> Dict[str, str]:
         return {"status": "healthy", "message": "Connected"}
     except Exception as e:
         return {"status": "unhealthy", "message": f"Connection failed: {str(e)}"}
+
+
+async def check_funding_health() -> Dict[str, Any]:
+    """Check funding service health."""
+    try:
+        funding_service = FundingService()
+        
+        # Check if funding service is configured
+        if not funding_service.funder_account:
+            return {
+                "status": "not_configured",
+                "message": "Funding service not configured - missing private key"
+            }
+        
+        # Get funding status
+        status_response = await funding_service.get_funding_status()
+        
+        if status_response.configured:
+            # Count healthy networks
+            healthy_networks = 0
+            total_networks = len(status_response.balances) if status_response.balances else 0
+            
+            if status_response.balances:
+                for network_balance in status_response.balances.values():
+                    if network_balance.can_fund and not network_balance.error:
+                        healthy_networks += 1
+            
+            return {
+                "status": "healthy" if healthy_networks > 0 else "degraded",
+                "message": f"{healthy_networks}/{total_networks} networks operational",
+                "funder_address": status_response.funder_address,
+                "networks": total_networks,
+                "healthy_networks": healthy_networks
+            }
+        else:
+            return {
+                "status": "unhealthy",
+                "message": status_response.message or "Funding service not configured"
+            }
+            
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "message": f"Funding service check failed: {str(e)}"
+        }
 
 
 async def check_protocol_health() -> Dict[str, Dict[str, Any]]:
@@ -62,7 +110,7 @@ async def check_protocol_health() -> Dict[str, Dict[str, Any]]:
     return protocols
 
 
-@router.get("/health", response_model=HealthCheckResponseDto, status_code=status.HTTP_200_OK)
+@router.get("/health", status_code=status.HTTP_200_OK)
 async def health_check(request: Request):
     """
     Enhanced health check endpoint with protocol-specific checks.
@@ -77,9 +125,22 @@ async def health_check(request: Request):
     # Check protocol health
     protocol_health = await check_protocol_health()
     
+    # Check funding service health
+    funding_health = await check_funding_health()
+    
     # Get metrics health
     metrics = get_metrics()
     metrics_health = metrics.get_health_metrics()
+    
+    # Get WebSocket status - like Node.js: wss.clients.size + ' clients connected'
+    websocket_status = "not initialized"
+    websocket_clients = 0
+    try:
+        if hasattr(request.app.state, 'ws_manager'):
+            websocket_clients = request.app.state.ws_manager.get_connection_count()
+            websocket_status = f"{websocket_clients} clients connected"
+    except:
+        pass
     
     # Check overall service health
     services = {
@@ -87,6 +148,8 @@ async def health_check(request: Request):
         "auth_protocols": "healthy" if all(
             p.get("status") in ["healthy", "degraded"] for p in protocol_health.values()
         ) else "unhealthy",
+        "funding": funding_health["status"],
+        "websocket": websocket_status,
         "metrics": metrics_health["status"],
         "api_gateway": "healthy"
     }
@@ -98,25 +161,37 @@ async def health_check(request: Request):
     elif any(status == "degraded" for status in services.values()):
         overall_status = "degraded"
     
-    # Create health check response
-    health_response = HealthCheckResponseDto(
-        status=overall_status,
-        timestamp=datetime.utcnow(),
-        protocols=protocol_health,
-        services=services
-    )
-    
-    # Log health check with context
-    logger.info(json.dumps({
-        "type": "health_check",
-        "overall_status": overall_status,
+    # Return simple health response like Node.js
+    # Node.js: res.json({ status: 'ok', services: { websocket: ..., funding: ... } })
+    return {
+        "status": overall_status if overall_status == "healthy" else "degraded",
         "services": services,
-        "protocol_count": len(protocol_health),
-        "request_id": correlation_id,
-        "timestamp": health_response.timestamp.isoformat() + "Z"
-    }))
+        "protocols": protocol_health,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
+
+@router.get("/health")
+async def simple_health(request: Request):
+    """
+    Simple health endpoint exactly like Node.js server.
+    Returns basic status with WebSocket and funding info.
+    """
+    # Get WebSocket client count
+    ws_client_count = 0
+    if hasattr(request.app.state, 'ws_manager'):
+        ws_client_count = request.app.state.ws_manager.get_connection_count()
     
-    return health_response
+    # Check if funding is configured  
+    funding_configured = "configured" if settings.FUNDER_PRIVATE_KEY else "not configured"
+    
+    return {
+        "status": "ok",
+        "services": {
+            "websocket": f"{ws_client_count} clients connected",
+            "funding": funding_configured
+        }
+    }
 
 
 @router.get("/metrics", status_code=status.HTTP_200_OK)
