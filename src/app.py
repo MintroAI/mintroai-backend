@@ -95,7 +95,7 @@ curl -X POST "/api/v1/auth/verify" \\
     app.add_middleware(RateLimitMiddleware)
 
     # Include routers
-    from src.api.router import websocket
+    from src.api.router import websocket, config, webhook
     
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
@@ -103,11 +103,18 @@ curl -X POST "/api/v1/auth/verify" \\
     app.include_router(funding.router)  # Funding router uses /api/v1 prefix
     app.include_router(protected.router, prefix="/api/v1")
     app.include_router(mock_endpoint.router, prefix="/api/v1")
-    app.include_router(websocket.router)  # WebSocket endpoints
+    
+    # Include Node.js compatible endpoints (without prefix)
+    app.include_router(config.router)  # /config endpoints
+    app.include_router(webhook.router)  # /webhook endpoint
+    app.include_router(websocket.router)  # /ws endpoint
 
     # Initialize WebSocket manager
     from src.core.service.websocket.manager import ConnectionManager
     app.state.ws_manager = ConnectionManager()
+    
+    # Initialize configurations store - exactly like Node.js
+    app.state.configurations = {}
     
     @app.on_event("startup")
     async def startup_event():

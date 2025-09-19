@@ -1,6 +1,6 @@
 """WebSocket router for real-time communication."""
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from src.core.logger.logger import logger
 
@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, request: Request):
+async def websocket_endpoint(websocket: WebSocket):
     """
     WebSocket endpoint for real-time communication.
     Simple implementation like Node.js server.
@@ -16,8 +16,8 @@ async def websocket_endpoint(websocket: WebSocket, request: Request):
     Clients can connect to this endpoint to receive real-time updates
     about funding events and other broadcasts.
     """
-    # Get manager from app state
-    manager = request.app.state.ws_manager
+    # Get manager from app state - WebSocket has app attribute
+    manager = websocket.app.state.ws_manager
     
     # Accept connection
     await manager.connect(websocket)
