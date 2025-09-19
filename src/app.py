@@ -95,13 +95,20 @@ curl -X POST "/api/v1/auth/verify" \\
     app.add_middleware(RateLimitMiddleware)
 
     # Include routers
+    from src.api.router import websocket
+    
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(chat.router, prefix="/api/v1")
     app.include_router(funding.router)  # Funding router uses /api/v1 prefix
     app.include_router(protected.router, prefix="/api/v1")
     app.include_router(mock_endpoint.router, prefix="/api/v1")
+    app.include_router(websocket.router)  # WebSocket endpoints
 
+    # Initialize WebSocket manager
+    from src.core.service.websocket.manager import ConnectionManager
+    app.state.ws_manager = ConnectionManager()
+    
     @app.on_event("startup")
     async def startup_event():
         logger.info(json.dumps({

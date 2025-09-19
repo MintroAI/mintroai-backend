@@ -108,7 +108,7 @@ async def check_protocol_health() -> Dict[str, Dict[str, Any]]:
     return protocols
 
 
-@router.get("/health", response_model=HealthCheckResponseDto, status_code=status.HTTP_200_OK)
+@router.get("/health", status_code=status.HTTP_200_OK)
 async def health_check(request: Request):
     """
     Enhanced health check endpoint with protocol-specific checks.
@@ -130,6 +130,16 @@ async def health_check(request: Request):
     metrics = get_metrics()
     metrics_health = metrics.get_health_metrics()
     
+    # Get WebSocket status - like Node.js: wss.clients.size + ' clients connected'
+    websocket_status = "not initialized"
+    websocket_clients = 0
+    try:
+        if hasattr(request.app.state, 'ws_manager'):
+            websocket_clients = request.app.state.ws_manager.get_connection_count()
+            websocket_status = f"{websocket_clients} clients connected"
+    except:
+        pass
+    
     # Check overall service health
     services = {
         "redis": redis_health["status"],
@@ -137,6 +147,7 @@ async def health_check(request: Request):
             p.get("status") in ["healthy", "degraded"] for p in protocol_health.values()
         ) else "unhealthy",
         "funding": funding_health["status"],
+        "websocket": websocket_status,
         "metrics": metrics_health["status"],
         "api_gateway": "healthy"
     }
@@ -148,25 +159,14 @@ async def health_check(request: Request):
     elif any(status == "degraded" for status in services.values()):
         overall_status = "degraded"
     
-    # Create health check response
-    health_response = HealthCheckResponseDto(
-        status=overall_status,
-        timestamp=datetime.utcnow(),
-        protocols=protocol_health,
-        services=services
-    )
-    
-    # Log health check with context
-    logger.info(json.dumps({
-        "type": "health_check",
-        "overall_status": overall_status,
+    # Return simple health response like Node.js
+    # Node.js: res.json({ status: 'ok', services: { websocket: ..., funding: ... } })
+    return {
+        "status": overall_status if overall_status == "healthy" else "degraded",
         "services": services,
-        "protocol_count": len(protocol_health),
-        "request_id": correlation_id,
-        "timestamp": health_response.timestamp.isoformat() + "Z"
-    }))
-    
-    return health_response
+        "protocols": protocol_health,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
 
 
 @router.get("/metrics", status_code=status.HTTP_200_OK)
