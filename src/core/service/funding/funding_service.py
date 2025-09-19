@@ -184,21 +184,52 @@ class FundingService:
         except Exception as e:
             logger.error(f"Funding error: {e}")
             
-            # Handle specific error types
+            # Handle specific Web3 error types
             error_message = str(e)
-            if "insufficient funds" in error_message.lower():
+            error_type = type(e).__name__
+            
+            # Insufficient funds error
+            if "insufficient funds" in error_message.lower() or "insufficient balance" in error_message.lower():
                 return FundingResponse(
                     success=False,
                     funded=False,
-                    message="Funding failed",
-                    error="Insufficient funder balance"
+                    message="Funder wallet has insufficient balance",
+                    error="INSUFFICIENT_FUNDS"
                 )
             
+            # Network connection errors
+            if "connection" in error_message.lower() or "timeout" in error_message.lower() or "network" in error_message.lower():
+                return FundingResponse(
+                    success=False,
+                    funded=False,
+                    message="Network connection error. Please try again.",
+                    error="NETWORK_ERROR"
+                )
+            
+            # Gas estimation errors
+            if "gas" in error_message.lower() and ("estimate" in error_message.lower() or "limit" in error_message.lower()):
+                return FundingResponse(
+                    success=False,
+                    funded=False,
+                    message="Transaction gas estimation failed",
+                    error="GAS_ESTIMATION_ERROR"
+                )
+            
+            # Transaction failed errors
+            if "transaction" in error_message.lower() and ("failed" in error_message.lower() or "reverted" in error_message.lower()):
+                return FundingResponse(
+                    success=False,
+                    funded=False,
+                    message="Transaction failed on blockchain",
+                    error="TRANSACTION_FAILED"
+                )
+            
+            # Generic error
             return FundingResponse(
                 success=False,
                 funded=False,
-                message="Funding failed",
-                error=error_message
+                message="Failed to fund address",
+                error=f"UNKNOWN_ERROR: {error_type}"
             )
     
     async def check_balance(self, address: str, chain_id: str) -> BalanceResponse:
