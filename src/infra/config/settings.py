@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     ]
     NEAR_MAX_RETRIES: int = 3
     NEAR_TIMEOUT_SECONDS: int = 30
+    
+    # Chain Signatures Funding Settings
+    NEXT_PUBLIC_FUNDER_PRIVATE_KEY: Optional[str] = None  # Private key for funding wallet
     NEAR_ENABLED: bool = True
     
     # n8n Workflow Settings

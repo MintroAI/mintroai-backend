@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.infra.config.settings import settings
 from src.core.logger.logger import logger
-from src.api.router import health, protected, mock_endpoint, auth, chat
+from src.api.router import health, protected, mock_endpoint, auth, chat, funding
 from src.api.middleware.security.rate_limiter import RateLimitMiddleware
 from src.api.middleware.security.audit_logger import AuditLoggingMiddleware
 from src.api.middleware.logging.request_logging import RequestLoggingMiddleware
@@ -98,6 +98,7 @@ curl -X POST "/api/v1/auth/verify" \\
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(chat.router, prefix="/api/v1")
+    app.include_router(funding.router)  # Funding router uses /api/v1 prefix
     app.include_router(protected.router, prefix="/api/v1")
     app.include_router(mock_endpoint.router, prefix="/api/v1")
 
