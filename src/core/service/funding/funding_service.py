@@ -1,7 +1,6 @@
 """Funding service for Chain Signatures."""
 
 import os
-import asyncio
 from typing import Dict, Optional
 from decimal import Decimal
 
@@ -173,31 +172,8 @@ class FundingService:
             # Wait for confirmation
             tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
             
-            # Broadcast funding event via WebSocket - exactly like Node.js
-            # broadcast({
-            #   type: 'addressFunded',
-            #   address,
-            #   chainId,
-            #   amount: networkConfig.fundingAmount,
-            #   txHash: tx.hash
-            # })
-            try:
-                from fastapi import FastAPI
-                from starlette.requests import Request
-                
-                # Get app instance to access WebSocket manager
-                # This will be passed from the router
-                if hasattr(request, '_app_state'):
-                    manager = request._app_state.ws_manager
-                    asyncio.create_task(manager.broadcast({
-                        "type": "addressFunded",
-                        "address": checksum_address,
-                        "chainId": request.chain_id,
-                        "amount": network_config['funding_amount'],
-                        "txHash": tx_hash.hex()
-                    }))
-            except Exception as e:
-                logger.warning(f"Failed to broadcast funding event: {e}")
+            # Note: WebSocket broadcast removed - funding service should not handle WebSocket directly
+            # If needed, this should be handled at the router level
             
             return FundingResponse(
                 success=True,

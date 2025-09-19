@@ -170,30 +170,6 @@ async def health_check(request: Request):
         "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
-
-@router.get("/health")
-async def simple_health(request: Request):
-    """
-    Simple health endpoint exactly like Node.js server.
-    Returns basic status with WebSocket and funding info.
-    """
-    # Get WebSocket client count
-    ws_client_count = 0
-    if hasattr(request.app.state, 'ws_manager'):
-        ws_client_count = request.app.state.ws_manager.get_connection_count()
-    
-    # Check if funding is configured  
-    funding_configured = "configured" if settings.FUNDER_PRIVATE_KEY else "not configured"
-    
-    return {
-        "status": "ok",
-        "services": {
-            "websocket": f"{ws_client_count} clients connected",
-            "funding": funding_configured
-        }
-    }
-
-
 @router.get("/metrics", status_code=status.HTTP_200_OK)
 async def get_metrics_endpoint():
     """
