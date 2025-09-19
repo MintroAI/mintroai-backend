@@ -32,6 +32,11 @@ class FundingService:
             "rpc_url": "https://testnet.aurora.dev",
             "funding_amount": "0.0025",  # in ETH
             "name": "Aurora Testnet"
+        },
+        "42161": {  # Arbitrum
+            "rpc_url": "https://arb1.arbitrum.io/rpc",
+            "funding_amount": "0.001",  # in ETH
+            "name": "Arbitrum"
         }
     }
     
