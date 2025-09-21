@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     N8N_VESTING_WORKFLOW_URL: str = "https://mintro.app.n8n.cloud/webhook/9a30de38-7fbc-4de1-bac3-69f5b627304f"
     N8N_GENERAL_WORKFLOW_URL: str = "https://chaingpt-proxy-production.up.railway.app/chat/general"
     
+    # Contract Generation Settings
+    CONTRACT_GENERATOR_URL: Optional[str] = None  # External contract generation service URL
+    CONTRACT_GENERATION_DAILY_LIMIT: int = 50  # Daily limit per user
+    EXTERNAL_SERVICE_TOKEN: Optional[str] = None  # Optional auth token for external service
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
