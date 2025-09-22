@@ -46,20 +46,15 @@ class ContractController:
                 'wallet_address': getattr(current_user, 'wallet_address', None)
             }
             
-            logger.info(
-                f"Contract generation request from user: {user_data.get('wallet_address')}, "
-                f"type: {contract_data.contractType}"
-            )
-            
             # Generate contract using service
             result = await self.contract_service.generate_contract(
                 contract_data=contract_data,
                 user_data=user_data
             )
             
-            logger.info(
-                f"Contract generated successfully for user: {user_data.get('wallet_address')}"
-            )
+            # Normalize response for frontend
+            if hasattr(result, 'contract') and result.contract:
+                result.contractCode = result.contract
             
             return result
             
@@ -71,4 +66,46 @@ class ContractController:
             raise HTTPException(
                 status_code=500,
                 detail=f"Contract generation failed: {str(e)}"
+            )
+    
+    async def compile_contract(
+        self,
+        chat_id: str,
+        current_user: dict
+    ) -> dict:
+        """
+        Compile smart contract by chat ID
+        
+        Args:
+            chat_id: Chat ID from contract generation
+            current_user: Authenticated user data from JWT
+            
+        Returns:
+            Compilation result with bytecode and ABI
+            
+        Raises:
+            HTTPException: If compilation fails
+        """
+        try:
+            # Extract wallet address from token payload
+            user_data = {
+                'wallet_address': getattr(current_user, 'wallet_address', None)
+            }
+            
+            # Compile contract using service
+            result = await self.contract_service.compile_contract(
+                chat_id=chat_id,
+                user_data=user_data
+            )
+            
+            return result
+            
+        except HTTPException:
+            # Re-raise HTTP exceptions as-is
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in contract compilation: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Contract compilation failed: {str(e)}"
             )

@@ -8,7 +8,9 @@ from src.api.controller.contract.contract_controller import ContractController
 from src.core.service.contract.models import (
     TokenContractData,
     VestingContractData,
-    ContractGenerationResponse
+    ContractGenerationResponse,
+    CompileContractRequest,
+    CompileContractResponse
 )
 from src.core.service.auth.jwt_service import JWTService
 from src.core.service.auth.models.token import TokenType
@@ -78,5 +80,39 @@ async def generate_contract(
     """
     return await contract_controller.generate_contract(
         contract_data=contract_data,
+        current_user=current_user
+    )
+
+
+@router.post(
+    "/compile-contract",
+    response_model=CompileContractResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Compile Smart Contract",
+    description="Compile a generated smart contract using chat ID"
+)
+async def compile_contract(
+    request: dict,  # Geçici olarak dict yapalım
+    current_user: dict = Depends(verify_token)
+) -> CompileContractResponse:
+    """
+    Compile a smart contract that was previously generated.
+    
+    This endpoint requires JWT authentication.
+    
+    Args:
+        request: Compilation request with chatId
+        current_user: Authenticated user from JWT
+        
+    Returns:
+        CompileContractResponse with bytecode and ABI
+    """
+    logger.info(f"Compile request data: {request}")
+    chat_id = request.get('chatId') or request.get('chat_id')
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="chatId field is required")
+    
+    return await contract_controller.compile_contract(
+        chat_id=chat_id,
         current_user=current_user
     )
