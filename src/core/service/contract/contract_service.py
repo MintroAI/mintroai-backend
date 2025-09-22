@@ -23,7 +23,7 @@ class ContractService:
     def __init__(self):
         self.contract_generator_url = os.getenv("CONTRACT_GENERATOR_URL")
         if not self.contract_generator_url:
-            logger.warning("CONTRACT_GENERATOR_URL not configured, will use mock responses")
+            raise ValueError("CONTRACT_GENERATOR_URL environment variable is required")
     
     async def generate_contract(
         self,
@@ -41,11 +41,7 @@ class ContractService:
             ContractGenerationResponse with generated contract code
         """
         try:
-            # 1. Check if we should use mock response
-            if not self.contract_generator_url:
-                return await self._generate_mock_contract(contract_data)
-            
-            # 2. Call external contract generation service
+            # Call external contract generation service
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     f"{self.contract_generator_url}/api/generate-contract",
@@ -97,23 +93,6 @@ class ContractService:
             Compilation result with bytecode and ABI
         """
         try:
-            # Check if we should use mock response
-            if not self.contract_generator_url:
-                return {
-                    "success": True,
-                    "bytecode": "0x608060405234801561001057600080fd5b50...",
-                    "abi": [
-                        {
-                            "inputs": [],
-                            "name": "name",
-                            "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-                            "stateMutability": "view",
-                            "type": "function"
-                        }
-                    ],
-                    "message": "Mock contract compiled successfully"
-                }
-            
             # Call external contract compilation service
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
