@@ -82,9 +82,35 @@ ContractData = Union[TokenContractData, VestingContractData]
 
 class ContractGenerationResponse(BaseModel):
     """Response model for contract generation"""
-    success: bool
+    success: Optional[bool] = True
     contractCode: Optional[str] = None
+    contract: Optional[str] = None  # External service uses 'contract' field
     message: Optional[str] = None
     error: Optional[str] = None
     transactionHash: Optional[str] = None
     contractAddress: Optional[str] = None
+    parameters: Optional[dict] = None
+    files: Optional[dict] = None
+    
+    @property
+    def code(self) -> Optional[str]:
+        """Get contract code from either contractCode or contract field"""
+        return self.contractCode or self.contract
+
+
+class CompileContractRequest(BaseModel):
+    """Request model for contract compilation"""
+    chatId: str
+
+
+class CompileContractResponse(BaseModel):
+    """Response model for contract compilation"""
+    success: Optional[bool] = True
+    bytecode: Optional[str] = None
+    abi: Optional[list] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
+    compiler: Optional[dict] = None
+    metadata: Optional[dict] = None
+    contractInfo: Optional[dict] = None
+    warnings: Optional[list] = None

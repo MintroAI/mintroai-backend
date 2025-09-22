@@ -23,7 +23,7 @@ class ContractService:
     def __init__(self):
         self.contract_generator_url = os.getenv("CONTRACT_GENERATOR_URL")
         if not self.contract_generator_url:
-            logger.warning("CONTRACT_GENERATOR_URL not configured, will use mock responses")
+            raise ValueError("CONTRACT_GENERATOR_URL environment variable is required")
     
     async def generate_contract(
         self,
@@ -41,19 +41,13 @@ class ContractService:
             ContractGenerationResponse with generated contract code
         """
         try:
-            # 1. Check if we should use mock response
-            if not self.contract_generator_url:
-                return await self._generate_mock_contract(contract_data)
-            
-            # 2. Call external contract generation service
+            # Call external contract generation service
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     f"{self.contract_generator_url}/api/generate-contract",
                     json=contract_data.dict(exclude_none=True),
                     headers={
                         "Content-Type": "application/json",
-                        # Optional: Add auth header if needed
-                        # "Authorization": f"Bearer {os.getenv('EXTERNAL_SERVICE_TOKEN')}"
                     }
                 )
                 
@@ -68,11 +62,11 @@ class ContractService:
                 
                 result = response.json()
                 
-                logger.info(
-                    f"Contract generated successfully for user: {user_data.get('wallet_address')}"
-                )
-                
-                return ContractGenerationResponse(**result)
+                # Parse response and ensure contractCode is set
+                response_obj = ContractGenerationResponse(**result)
+                if not response_obj.contractCode and response_obj.contract:
+                    response_obj.contractCode = response_obj.contract
+                return response_obj
                 
         except HTTPException:
             raise
@@ -81,6 +75,57 @@ class ContractService:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to generate contract: {str(e)}"
+            )
+    
+    async def compile_contract(
+        self,
+        chat_id: str,
+        user_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Compile smart contract by chat ID
+        
+        Args:
+            chat_id: Chat ID from contract generation
+            user_data: Authenticated user data from JWT
+            
+        Returns:
+            Compilation result with bytecode and ABI
+        """
+        try:
+            # Call external contract compilation service
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.contract_generator_url}/api/compile-contract/{chat_id}",
+                    headers={
+                        "Content-Type": "application/json",
+                    }
+                )
+                
+                if response.status_code != 200:
+                    logger.error(
+                        f"External service error: {response.status_code} - {response.text}"
+                    )
+                    raise HTTPException(
+                        status_code=502,
+                        detail="Contract compilation service temporarily unavailable"
+                    )
+                
+                result = response.json()
+                
+                # Ensure success field is set
+                if 'success' not in result:
+                    result['success'] = True
+                
+                return result
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Contract compilation error: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to compile contract: {str(e)}"
             )
     
     async def _generate_mock_contract(
