@@ -20,8 +20,8 @@ security = HTTPBearer()
 
 # Create router  
 router = APIRouter(
-    prefix="/api/v1",  # Changed to /api/v1 to match frontend expectations
-    tags=["funding"],
+    prefix="/api/v1",
+    tags=["Funding"],
     responses={
         400: {"description": "Bad Request"},
         401: {"description": "Unauthorized"},

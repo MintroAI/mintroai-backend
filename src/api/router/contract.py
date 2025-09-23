@@ -26,10 +26,10 @@ security = HTTPBearer()
 # Create router with prefix and tags
 router = APIRouter(
     prefix="/api/v1",
-    tags=["Contract"],
+    tags=["Smart Contracts"],
     responses={
         401: {"description": "Unauthorized"},
-        502: {"description": "Bad Gateway - External Service Error"}
+        502: {"description": "Bad Gateway"}
     }
 )
 
@@ -58,7 +58,7 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
     response_model=ContractGenerationResponse,
     status_code=status.HTTP_200_OK,
     summary="Generate Smart Contract",
-    description="Generate a smart contract (Token or Vesting) based on provided configuration"
+    description="Generate a smart contract (Token or Vesting) with custom configuration. Requires JWT authentication."
 )
 async def generate_contract(
     contract_data: Union[TokenContractData, VestingContractData],
@@ -84,11 +84,11 @@ async def generate_contract(
 
 
 @router.post(
-    "/compile-contract",
+    "/compile-contract", 
     response_model=CompileContractResponse,
     status_code=status.HTTP_200_OK,
     summary="Compile Smart Contract",
-    description="Compile a generated smart contract using chat ID"
+    description="Compile a generated smart contract to bytecode and ABI using chat ID. Requires JWT authentication."
 )
 async def compile_contract(
     request: dict,  # Geçici olarak dict yapalım
@@ -120,15 +120,10 @@ async def compile_contract(
 
 @router.post(
     "/price-contract",
-    response_model=PriceContractResponse,
+    response_model=PriceContractResponse, 
     status_code=status.HTTP_200_OK,
     summary="Get Contract Price",
-    description="Get deployment price and signature for a smart contract",
-    responses={
-        400: {"description": "Bad Request - Invalid input data"},
-        401: {"description": "Unauthorized"},
-        502: {"description": "Bad Gateway - External Service Error"}
-    }
+    description="Calculate deployment cost and generate signature for contract deployment. Requires JWT authentication."
 )
 async def get_contract_price(
     price_request: PriceContractRequest,
