@@ -9,7 +9,9 @@ from src.core.service.contract.models import (
     TokenContractData,
     VestingContractData,
     ContractData,
-    ContractGenerationResponse
+    ContractGenerationResponse,
+    PriceContractRequest,
+    PriceContractResponse
 )
 
 
@@ -108,4 +110,46 @@ class ContractController:
             raise HTTPException(
                 status_code=500,
                 detail=f"Contract compilation failed: {str(e)}"
+            )
+    
+    async def get_price(
+        self,
+        price_request: PriceContractRequest,
+        current_user: dict
+    ) -> PriceContractResponse:
+        """
+        Get contract deployment price and signature
+        
+        Args:
+            price_request: Price request data with contractData and bytecode
+            current_user: Authenticated user data from JWT
+            
+        Returns:
+            Price and signature data for contract deployment
+            
+        Raises:
+            HTTPException: If price calculation fails
+        """
+        try:
+            # Extract wallet address from token payload
+            user_data = {
+                'wallet_address': getattr(current_user, 'wallet_address', None)
+            }
+            
+            # Get price using service
+            result = await self.contract_service.get_price(
+                price_request=price_request,
+                user_data=user_data
+            )
+            
+            return result
+            
+        except HTTPException:
+            # Re-raise HTTP exceptions as-is
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in contract pricing: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Contract pricing failed: {str(e)}"
             )

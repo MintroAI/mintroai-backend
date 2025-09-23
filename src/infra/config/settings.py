@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     CONTRACT_GENERATION_DAILY_LIMIT: int = 50  # Daily limit per user
     EXTERNAL_SERVICE_TOKEN: Optional[str] = None  # Optional auth token for external service
     
+    # Contract Pricing Settings
+    SIGNATURE_SERVICE_URL: Optional[str] = None  # External signature/pricing service URL
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

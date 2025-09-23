@@ -10,7 +10,9 @@ from src.core.service.contract.models import (
     VestingContractData,
     ContractGenerationResponse,
     CompileContractRequest,
-    CompileContractResponse
+    CompileContractResponse,
+    PriceContractRequest,
+    PriceContractResponse
 )
 from src.core.service.auth.jwt_service import JWTService
 from src.core.service.auth.models.token import TokenType
@@ -30,10 +32,6 @@ router = APIRouter(
         502: {"description": "Bad Gateway - External Service Error"}
     }
 )
-
-# Initialize controller
-contract_controller = ContractController()
-
 
 async def get_jwt_service() -> JWTService:
     """Get JWT service with dependencies."""
@@ -78,7 +76,8 @@ async def generate_contract(
     Returns:
         ContractGenerationResponse with generated contract code
     """
-    return await contract_controller.generate_contract(
+    controller = ContractController()
+    return await controller.generate_contract(
         contract_data=contract_data,
         current_user=current_user
     )
@@ -112,7 +111,44 @@ async def compile_contract(
     if not chat_id:
         raise HTTPException(status_code=400, detail="chatId field is required")
     
-    return await contract_controller.compile_contract(
+    controller = ContractController()
+    return await controller.compile_contract(
         chat_id=chat_id,
+        current_user=current_user
+    )
+
+
+@router.post(
+    "/price-contract",
+    response_model=PriceContractResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Contract Price",
+    description="Get deployment price and signature for a smart contract",
+    responses={
+        400: {"description": "Bad Request - Invalid input data"},
+        401: {"description": "Unauthorized"},
+        502: {"description": "Bad Gateway - External Service Error"}
+    }
+)
+async def get_contract_price(
+    price_request: PriceContractRequest,
+    current_user: dict = Depends(verify_token)
+) -> PriceContractResponse:
+    """
+    Get deployment price and signature for a smart contract.
+    
+    This endpoint requires JWT authentication and calculates the cost
+    and generates signature data needed for contract deployment.
+    
+    Args:
+        price_request: Request containing contractData and bytecode
+        current_user: Authenticated user from JWT
+        
+    Returns:
+        PriceContractResponse with pricing and signature data
+    """
+    controller = ContractController()
+    return await controller.get_price(
+        price_request=price_request,
         current_user=current_user
     )
