@@ -30,6 +30,72 @@ class ContractService:
         self.signature_service_url = os.getenv("SIGNATURE_SERVICE_URL")
         if not self.signature_service_url:
             raise ValueError("SIGNATURE_SERVICE_URL environment variable is required")
+        
+        # Configure HTTP timeout from environment or use default
+        self.http_timeout = float(os.getenv("CONTRACT_HTTP_TIMEOUT", "30.0"))
+    
+    async def _make_http_request(
+        self,
+        method: str,
+        url: str,
+        json_data: Dict[str, Any] = None,
+        service_name: str = "External service"
+    ) -> Dict[str, Any]:
+        """
+        Make HTTP request to external service with common error handling
+        
+        Args:
+            method: HTTP method (POST, GET, etc.)
+            url: Full URL to make request to
+            json_data: JSON payload for request
+            service_name: Name of service for error messages
+            
+        Returns:
+            JSON response from service
+            
+        Raises:
+            HTTPException: If request fails
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.http_timeout) as client:
+                if method.upper() == "POST":
+                    response = await client.post(
+                        url,
+                        json=json_data,
+                        headers={"Content-Type": "application/json"}
+                    )
+                else:
+                    response = await client.request(method, url)
+                
+                if response.status_code != 200:
+                    logger.error(
+                        f"{service_name} error: {response.status_code} - {response.text}"
+                    )
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"{service_name} temporarily unavailable"
+                    )
+                
+                return response.json()
+                
+        except httpx.TimeoutException:
+            logger.error(f"{service_name} timeout after {self.http_timeout}s")
+            raise HTTPException(
+                status_code=504,
+                detail=f"{service_name} timeout"
+            )
+        except httpx.RequestError as e:
+            logger.error(f"{service_name} connection error: {str(e)}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"{service_name} connection failed"
+            )
+        except Exception as e:
+            logger.error(f"{service_name} unexpected error: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"{service_name} request failed"
+            )
     
     async def generate_contract(
         self,
@@ -48,31 +114,18 @@ class ContractService:
         """
         try:
             # Call external contract generation service
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.contract_generator_url}/api/generate-contract",
-                    json=contract_data.dict(exclude_none=True),
-                    headers={
-                        "Content-Type": "application/json",
-                    }
-                )
-                
-                if response.status_code != 200:
-                    logger.error(
-                        f"External service error: {response.status_code} - {response.text}"
-                    )
-                    raise HTTPException(
-                        status_code=502,
-                        detail="Contract generation service temporarily unavailable"
-                    )
-                
-                result = response.json()
-                
-                # Parse response and ensure contractCode is set
-                response_obj = ContractGenerationResponse(**result)
-                if not response_obj.contractCode and response_obj.contract:
-                    response_obj.contractCode = response_obj.contract
-                return response_obj
+            result = await self._make_http_request(
+                method="POST",
+                url=f"{self.contract_generator_url}/api/generate-contract",
+                json_data=contract_data.dict(exclude_none=True),
+                service_name="Contract generation service"
+            )
+            
+            # Parse response and ensure contractCode is set
+            response_obj = ContractGenerationResponse(**result)
+            if not response_obj.contractCode and response_obj.contract:
+                response_obj.contractCode = response_obj.contract
+            return response_obj
                 
         except HTTPException:
             raise
@@ -100,30 +153,17 @@ class ContractService:
         """
         try:
             # Call external contract compilation service
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.contract_generator_url}/api/compile-contract/{chat_id}",
-                    headers={
-                        "Content-Type": "application/json",
-                    }
-                )
-                
-                if response.status_code != 200:
-                    logger.error(
-                        f"External service error: {response.status_code} - {response.text}"
-                    )
-                    raise HTTPException(
-                        status_code=502,
-                        detail="Contract compilation service temporarily unavailable"
-                    )
-                
-                result = response.json()
-                
-                # Ensure success field is set
-                if 'success' not in result:
-                    result['success'] = True
-                
-                return result
+            result = await self._make_http_request(
+                method="POST",
+                url=f"{self.contract_generator_url}/api/compile-contract/{chat_id}",
+                service_name="Contract compilation service"
+            )
+            
+            # Ensure success field is set
+            if 'success' not in result:
+                result['success'] = True
+            
+            return result
                 
         except HTTPException:
             raise
@@ -162,31 +202,18 @@ class ContractService:
             }
             
             # Call external signature service
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.signature_service_url}/api/signature/prepare",
-                    json=request_payload,
-                    headers={
-                        "Content-Type": "application/json",
-                    }
-                )
-                
-                if response.status_code != 200:
-                    logger.error(
-                        f"Signature service error: {response.status_code} - {response.text}"
-                    )
-                    raise HTTPException(
-                        status_code=502,
-                        detail="Price calculation service temporarily unavailable"
-                    )
-                
-                result = response.json()
-                
-                # Ensure success field is set
-                if 'success' not in result:
-                    result['success'] = True
-                
-                return PriceContractResponse(**result)
+            result = await self._make_http_request(
+                method="POST",
+                url=f"{self.signature_service_url}/api/signature/prepare",
+                json_data=request_payload,
+                service_name="Price calculation service"
+            )
+            
+            # Ensure success field is set
+            if 'success' not in result:
+                result['success'] = True
+            
+            return PriceContractResponse(**result)
                 
         except HTTPException:
             raise
