@@ -114,3 +114,45 @@ class CompileContractResponse(BaseModel):
     metadata: Optional[dict] = None
     contractInfo: Optional[dict] = None
     warnings: Optional[list] = None
+
+
+class PriceContractRequest(BaseModel):
+    """Request model for contract pricing"""
+    contractData: dict  # Contains contract metadata (ownerAddress, chainId, etc.)
+    bytecode: str
+    deployerAddress: Optional[str] = None  # If not provided, will use contractData.ownerAddress
+    deploymentType: Optional[str] = "create"  # Default deployment type
+
+    @field_validator('bytecode')
+    @classmethod
+    def validate_bytecode(cls, v):
+        """Ensure bytecode is properly formatted"""
+        if not v:
+            raise ValueError('Bytecode is required')
+        # Ensure it starts with 0x
+        if not v.startswith('0x'):
+            v = f'0x{v}'
+        return v
+
+    @field_validator('contractData')
+    @classmethod
+    def validate_contract_data(cls, v):
+        """Validate required fields in contractData"""
+        if not isinstance(v, dict):
+            raise ValueError('contractData must be a dictionary')
+        
+        if not v.get('ownerAddress'):
+            raise ValueError('ownerAddress is required in contractData')
+        
+        if not v.get('chainId'):
+            raise ValueError('chainId is required in contractData')
+        
+        return v
+
+
+class PriceContractResponse(BaseModel):
+    """Response model for contract pricing"""
+    success: Optional[bool] = True
+    data: Optional[dict] = None  # Contains signature, deploymentData, pricing, etc.
+    message: Optional[str] = None
+    error: Optional[str] = None

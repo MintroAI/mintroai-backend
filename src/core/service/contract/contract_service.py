@@ -10,7 +10,9 @@ from .models import (
     ContractData,
     TokenContractData,
     VestingContractData,
-    ContractGenerationResponse
+    ContractGenerationResponse,
+    PriceContractRequest,
+    PriceContractResponse
 )
 
 
@@ -24,6 +26,10 @@ class ContractService:
         self.contract_generator_url = os.getenv("CONTRACT_GENERATOR_URL")
         if not self.contract_generator_url:
             raise ValueError("CONTRACT_GENERATOR_URL environment variable is required")
+        
+        self.signature_service_url = os.getenv("SIGNATURE_SERVICE_URL")
+        if not self.signature_service_url:
+            raise ValueError("SIGNATURE_SERVICE_URL environment variable is required")
     
     async def generate_contract(
         self,
@@ -126,6 +132,69 @@ class ContractService:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to compile contract: {str(e)}"
+            )
+    
+    async def get_price(
+        self,
+        price_request: PriceContractRequest,
+        user_data: Dict[str, Any]
+    ) -> PriceContractResponse:
+        """
+        Get contract deployment price and signature
+        
+        Args:
+            price_request: Price request data with contractData and bytecode
+            user_data: Authenticated user data from JWT
+            
+        Returns:
+            PriceContractResponse with pricing and signature data
+        """
+        try:
+            # Extract deployer address from request or contractData
+            deployer_address = price_request.deployerAddress or price_request.contractData.get('ownerAddress')
+            
+            # Prepare request payload
+            request_payload = {
+                "contractData": price_request.contractData,
+                "bytecode": price_request.bytecode,
+                "deployerAddress": deployer_address,
+                "deploymentType": price_request.deploymentType
+            }
+            
+            # Call external signature service
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.signature_service_url}/api/signature/prepare",
+                    json=request_payload,
+                    headers={
+                        "Content-Type": "application/json",
+                    }
+                )
+                
+                if response.status_code != 200:
+                    logger.error(
+                        f"Signature service error: {response.status_code} - {response.text}"
+                    )
+                    raise HTTPException(
+                        status_code=502,
+                        detail="Price calculation service temporarily unavailable"
+                    )
+                
+                result = response.json()
+                
+                # Ensure success field is set
+                if 'success' not in result:
+                    result['success'] = True
+                
+                return PriceContractResponse(**result)
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Contract pricing error: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to calculate contract price: {str(e)}"
             )
     
     async def _generate_mock_contract(
