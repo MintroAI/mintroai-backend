@@ -14,91 +14,16 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         description="""
-# 🚀 MintroAI Blockchain Services API
+MintroAI Blockchain Services API - Multi-protocol authentication, smart contract generation, and DeFi services.
 
-A comprehensive platform for blockchain authentication, smart contract generation, and DeFi services.
+## Services
+- **Authentication**: EVM and NEAR Protocol wallet authentication
+- **Smart Contracts**: Token and vesting contract generation, compilation, pricing
+- **DeFi**: NEAR Chain Signatures and cross-chain funding
+- **Chat**: AI-powered assistance and WebSocket support
 
-## 🔐 **Authentication Services**
-Multi-protocol wallet authentication supporting EVM and NEAR Protocol.
-
-### Supported Protocols
-- **EVM**: Ethereum, Polygon, BSC, Arbitrum, Optimism
-- **NEAR**: NEAR Protocol blockchain
-
-### Auth Flow
-1. **Create Challenge** → Get unique message to sign
-2. **Sign Message** → Use your wallet to sign
-3. **Verify Signature** → Get JWT tokens
-4. **Access Protected Endpoints** → Use Bearer token
-
-## 📜 **Smart Contract Services**
-End-to-end smart contract development and deployment.
-
-### Contract Generation
-- **Token Contracts**: ERC20/NEP-141 with customizable features
-- **Vesting Contracts**: Token vesting with cliff and release schedules
-- **Custom Parameters**: Mintable, burnable, pausable, anti-bot features
-
-### Contract Compilation
-- **Solidity Compilation**: Generate bytecode and ABI
-- **Cross-chain Support**: Multiple blockchain targets
-- **Optimization**: Gas-optimized contract bytecode
-
-### Contract Pricing
-- **Deployment Costs**: Real-time gas estimation
-- **Signature Generation**: Ready-to-deploy transaction data
-- **Multi-chain Support**: Different networks and gas tokens
-
-## 💰 **DeFi Services**
-- **NEAR Chain Signatures**: Cross-chain transaction funding
-- **Multi-chain Wallet**: Unified wallet management
-
-## 🛡️ **Security Features**
-- JWT-based authentication
-- Rate limiting and IP blocking
-- Audit logging and monitoring
-- Input validation and sanitization
-
-## 📡 **Real-time Features**
-- WebSocket connections for live updates
-- Chat integration with AI assistance
-- Real-time contract compilation status
-
-## 🚀 **Quick Start**
-
-### Authentication
-```bash
-# 1. Create challenge
-curl -X POST "/api/v1/auth/challenge" \\
-     -H "Content-Type: application/json" \\
-     -d '{"wallet_address": "0x...", "protocol": "evm"}'
-
-# 2. Verify signature
-curl -X POST "/api/v1/auth/verify" \\
-     -H "Content-Type: application/json" \\
-     -d '{"wallet_address": "0x...", "signature": "0x...", "protocol": "evm"}'
-```
-
-### Smart Contracts
-```bash
-# Generate contract
-curl -X POST "/api/v1/generate-contract" \\
-     -H "Authorization: Bearer <token>" \\
-     -H "Content-Type: application/json" \\
-     -d '{"contractType": "token", "tokenName": "MyToken", ...}'
-
-# Compile contract  
-curl -X POST "/api/v1/compile-contract" \\
-     -H "Authorization: Bearer <token>" \\
-     -H "Content-Type: application/json" \\
-     -d '{"chatId": "your-chat-id"}'
-
-# Get deployment price
-curl -X POST "/api/v1/price-contract" \\
-     -H "Authorization: Bearer <token>" \\
-     -H "Content-Type: application/json" \\
-     -d '{"contractData": {...}, "bytecode": "0x..."}'
-```
+## Authentication
+All protected endpoints require JWT Bearer token authentication.
         """,
         version=settings.APP_VERSION,
         docs_url="/",
