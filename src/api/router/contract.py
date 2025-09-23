@@ -33,8 +33,9 @@ router = APIRouter(
     }
 )
 
-# Initialize controller
-contract_controller = ContractController()
+async def get_contract_controller() -> ContractController:
+    """Get contract controller instance."""
+    return ContractController()
 
 
 async def get_jwt_service() -> JWTService:
@@ -66,7 +67,8 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
 )
 async def generate_contract(
     contract_data: Union[TokenContractData, VestingContractData],
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(verify_token),
+    controller: ContractController = Depends(get_contract_controller)
 ) -> ContractGenerationResponse:
     """
     Generate a smart contract with the provided configuration.
@@ -80,7 +82,7 @@ async def generate_contract(
     Returns:
         ContractGenerationResponse with generated contract code
     """
-    return await contract_controller.generate_contract(
+    return await controller.generate_contract(
         contract_data=contract_data,
         current_user=current_user
     )
@@ -95,7 +97,8 @@ async def generate_contract(
 )
 async def compile_contract(
     request: dict,  # Geçici olarak dict yapalım
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(verify_token),
+    controller: ContractController = Depends(get_contract_controller)
 ) -> CompileContractResponse:
     """
     Compile a smart contract that was previously generated.
@@ -114,7 +117,7 @@ async def compile_contract(
     if not chat_id:
         raise HTTPException(status_code=400, detail="chatId field is required")
     
-    return await contract_controller.compile_contract(
+    return await controller.compile_contract(
         chat_id=chat_id,
         current_user=current_user
     )
@@ -134,7 +137,8 @@ async def compile_contract(
 )
 async def get_contract_price(
     price_request: PriceContractRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(verify_token),
+    controller: ContractController = Depends(get_contract_controller)
 ) -> PriceContractResponse:
     """
     Get deployment price and signature for a smart contract.
@@ -149,7 +153,7 @@ async def get_contract_price(
     Returns:
         PriceContractResponse with pricing and signature data
     """
-    return await contract_controller.get_price(
+    return await controller.get_price(
         price_request=price_request,
         current_user=current_user
     )
