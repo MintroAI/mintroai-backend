@@ -1,0 +1,79 @@
+# Git
+.git
+.gitignore
+README.md
+ROADMAP_AND_ISSUES.md
+NEAR_AUTH_GUIDE.md
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.pytest_cache
+htmlcov
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+.env.local
+.env.development
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+
+# Testing
+.coverage
+.nyc_output
+coverage/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Development
+test_*.html
+tests/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
