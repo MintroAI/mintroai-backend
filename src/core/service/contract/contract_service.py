@@ -97,6 +97,26 @@ class ContractService:
                 detail=f"{service_name} request failed"
             )
     
+    def _handle_service_error(self, error: Exception, operation: str) -> HTTPException:
+        """
+        Handle service-level errors with consistent logging and response
+        
+        Args:
+            error: The exception that occurred
+            operation: Description of the operation that failed
+            
+        Returns:
+            HTTPException with appropriate status code and message
+        """
+        if isinstance(error, HTTPException):
+            return error
+        
+        logger.error(f"{operation} error: {str(error)}")
+        return HTTPException(
+            status_code=500,
+            detail=f"Failed to {operation.lower()}: {str(error)}"
+        )
+    
     async def generate_contract(
         self,
         contract_data: ContractData,
@@ -127,14 +147,8 @@ class ContractService:
                 response_obj.contractCode = response_obj.contract
             return response_obj
                 
-        except HTTPException:
-            raise
         except Exception as e:
-            logger.error(f"Contract generation error: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to generate contract: {str(e)}"
-            )
+            raise self._handle_service_error(e, "generate contract")
     
     async def compile_contract(
         self,
@@ -165,14 +179,8 @@ class ContractService:
             
             return result
                 
-        except HTTPException:
-            raise
         except Exception as e:
-            logger.error(f"Contract compilation error: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to compile contract: {str(e)}"
-            )
+            raise self._handle_service_error(e, "compile contract")
     
     async def get_price(
         self,
@@ -215,12 +223,6 @@ class ContractService:
             
             return PriceContractResponse(**result)
                 
-        except HTTPException:
-            raise
         except Exception as e:
-            logger.error(f"Contract pricing error: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to calculate contract price: {str(e)}"
-            )
+            raise self._handle_service_error(e, "calculate contract price")
     
