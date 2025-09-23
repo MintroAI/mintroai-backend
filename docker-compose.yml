@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Redis service for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: mintroai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - mintroai-network
+
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: mintroai-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Redis connection
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_MAX_CONNECTIONS=10
+      
+      # App settings
+      - DEBUG=false
+      - HOST=0.0.0.0
+      - PORT=8080
+      
+      # Security (use environment file for production)
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      - JWT_ALGORITHM=HS256
+      
+      # NEAR settings
+      - NEAR_ENABLED=true
+      - NEAR_NETWORK_ID=mainnet
+      
+      # External services (set in production)
+      - CONTRACT_GENERATOR_URL=${CONTRACT_GENERATOR_URL}
+      - SIGNATURE_SERVICE_URL=${SIGNATURE_SERVICE_URL}
+      - N8N_TOKEN_WORKFLOW_URL=${N8N_TOKEN_WORKFLOW_URL}
+      - N8N_VESTING_WORKFLOW_URL=${N8N_VESTING_WORKFLOW_URL}
+      - N8N_GENERAL_WORKFLOW_URL=${N8N_GENERAL_WORKFLOW_URL}
+      
+      # CORS origins (adjust for production)
+      - ALLOWED_ORIGINS=["http://localhost:3000","https://app.mintroai.com"]
+    
+    depends_on:
+      redis:
+        condition: service_healthy
+    
+    volumes:
+      - ./logs:/app/logs
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - mintroai-network
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  mintroai-network:
+    driver: bridge
