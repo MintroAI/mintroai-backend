@@ -6,6 +6,8 @@ import httpx
 from typing import Dict, Any
 from fastapi import HTTPException
 
+from src.core.http_client import HTTPClientConfig
+
 from .models import (
     ContractData,
     TokenContractData,
@@ -31,8 +33,8 @@ class ContractService:
         if not self.signature_service_url:
             raise ValueError("SIGNATURE_SERVICE_URL environment variable is required")
         
-        # Configure HTTP timeout from environment or use default
-        self.http_timeout = float(os.getenv("CONTRACT_HTTP_TIMEOUT", "30.0"))
+        # Use centralized HTTP configuration
+        self.http_config = HTTPClientConfig.create_client_config("contract")
     
     async def _make_http_request(
         self,
@@ -57,7 +59,7 @@ class ContractService:
             HTTPException: If request fails
         """
         try:
-            async with httpx.AsyncClient(timeout=self.http_timeout) as client:
+            async with httpx.AsyncClient(**self.http_config) as client:
                 if method.upper() == "POST":
                     response = await client.post(
                         url,
@@ -79,7 +81,7 @@ class ContractService:
                 return response.json()
                 
         except httpx.TimeoutException:
-            logger.error(f"{service_name} timeout after {self.http_timeout}s")
+            logger.error(f"{service_name} request timeout")
             raise HTTPException(
                 status_code=504,
                 detail=f"{service_name} timeout"

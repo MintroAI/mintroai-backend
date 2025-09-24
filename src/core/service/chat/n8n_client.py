@@ -10,6 +10,7 @@ from datetime import datetime
 from src.core.service.chat.models.chat import ChatRequest, ChatMode, UserContext
 from src.core.logger.logger import get_logger
 from src.infra.config.settings import get_settings
+from src.core.http_client import HTTPClientConfig
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -22,21 +23,21 @@ class N8nWorkflowConfig:
         self.workflows = {
             ChatMode.TOKEN: {
                 "url": settings.N8N_TOKEN_WORKFLOW_URL or "https://barisarya.app.n8n.cloud/webhook/b8bce491-1fee-470c-aa7a-20a5e619fa51",
-                "timeout": 25,
                 "url_pattern": "{base_url}/{session_id}",
-                "body_format": "action_based"
+                "body_format": "action_based",
+                "service_type": "n8n_chat"
             },
             ChatMode.VESTING: {
                 "url": settings.N8N_VESTING_WORKFLOW_URL or "https://mintro.app.n8n.cloud/webhook/9a30de38-7fbc-4de1-bac3-69f5b627304f",
-                "timeout": 25,
                 "url_pattern": "{base_url}/{session_id}",
-                "body_format": "action_based"
+                "body_format": "action_based",
+                "service_type": "n8n_chat"
             },
             ChatMode.GENERAL: {
                 "url": settings.N8N_GENERAL_WORKFLOW_URL or "https://chaingpt-proxy-production.up.railway.app/chat/general",
-                "timeout": 75,
                 "url_pattern": "{base_url}",
-                "body_format": "direct"
+                "body_format": "direct",
+                "service_type": "n8n_general"
             }
         }
 
@@ -47,6 +48,11 @@ class N8nClient:
     def __init__(self):
         self.config = N8nWorkflowConfig()
         self.logger = logger
+        # Pre-configure HTTP clients for different service types
+        self.http_configs = {
+            "n8n_chat": HTTPClientConfig.create_client_config("n8n_chat"),
+            "n8n_general": HTTPClientConfig.create_client_config("n8n_general")
+        }
         
     def _build_url(self, mode: ChatMode, session_id: str) -> str:
         """Build URL based on workflow configuration"""
@@ -111,25 +117,28 @@ class N8nClient:
         url = self._build_url(request.mode, request.sessionId)
         body = self._build_request_body(request, user_context)
         
+        # Get HTTP config for this service type
+        service_type = workflow["service_type"]
+        http_config = self.http_configs[service_type]
+        
         self.logger.info(
             f"Sending request to n8n workflow",
             extra={
                 "mode": request.mode.value,
                 "session_id": request.sessionId,
                 "url": url,
-                "timeout": workflow["timeout"]
+                "service_type": service_type
             }
         )
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(**http_config) as client:
             try:
                 start_time = datetime.utcnow()
                 
                 response = await client.post(
                     url,
                     json=body,
-                    headers={"Content-Type": "application/json"},
-                    timeout=workflow["timeout"]
+                    headers={"Content-Type": "application/json"}
                 )
                 
                 duration = (datetime.utcnow() - start_time).total_seconds()
@@ -180,16 +189,17 @@ class N8nClient:
                         return {"output": text, "raw": text}
                         
             except httpx.TimeoutException:
+                timeout_value = HTTPClientConfig.get_timeout(service_type)
                 self.logger.error(
                     f"n8n workflow timeout",
                     extra={
                         "mode": request.mode.value,
                         "session_id": request.sessionId,
-                        "timeout_seconds": workflow["timeout"]
+                        "timeout_seconds": timeout_value
                     }
                 )
                 raise TimeoutError(
-                    f"Request timeout - {request.mode.value} workflow took longer than {workflow['timeout']} seconds"
+                    f"Request timeout - {request.mode.value} workflow took longer than {timeout_value} seconds"
                 )
                 
             except httpx.RequestError as e:
