@@ -7,6 +7,9 @@ from typing import Dict, Any
 
 from src.core.http_client import HTTPClientConfig
 from src.core.exceptions.handler import ServiceError, ServiceErrorCode
+from src.infra.config.settings import get_settings
+
+settings = get_settings()
 
 from .models import (
     ContractData,
@@ -25,13 +28,14 @@ class ContractService:
     """Service for handling smart contract generation"""
     
     def __init__(self):
-        self.contract_generator_url = os.getenv("CONTRACT_GENERATOR_URL")
+        # Use centralized settings instead of os.getenv()
+        self.contract_generator_url = settings.CONTRACT_GENERATOR_URL
         if not self.contract_generator_url:
-            raise ValueError("CONTRACT_GENERATOR_URL environment variable is required")
+            raise ValueError("CONTRACT_GENERATOR_URL must be set in environment or settings")
         
-        self.signature_service_url = os.getenv("SIGNATURE_SERVICE_URL")
+        self.signature_service_url = settings.SIGNATURE_SERVICE_URL
         if not self.signature_service_url:
-            raise ValueError("SIGNATURE_SERVICE_URL environment variable is required")
+            raise ValueError("SIGNATURE_SERVICE_URL must be set in environment or settings")
         
         # Use centralized HTTP configuration
         self.http_config = HTTPClientConfig.create_client_config("contract")

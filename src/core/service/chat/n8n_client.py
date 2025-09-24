@@ -22,19 +22,19 @@ class N8nWorkflowConfig:
     def __init__(self):
         self.workflows = {
             ChatMode.TOKEN: {
-                "url": settings.N8N_TOKEN_WORKFLOW_URL or "https://barisarya.app.n8n.cloud/webhook/b8bce491-1fee-470c-aa7a-20a5e619fa51",
+                "url": settings.N8N_TOKEN_WORKFLOW_URL or settings.N8N_TOKEN_WORKFLOW_URL_DEFAULT,
                 "url_pattern": "{base_url}/{session_id}",
                 "body_format": "action_based",
                 "service_type": "n8n_chat"
             },
             ChatMode.VESTING: {
-                "url": settings.N8N_VESTING_WORKFLOW_URL or "https://mintro.app.n8n.cloud/webhook/9a30de38-7fbc-4de1-bac3-69f5b627304f",
+                "url": settings.N8N_VESTING_WORKFLOW_URL or settings.N8N_VESTING_WORKFLOW_URL_DEFAULT,
                 "url_pattern": "{base_url}/{session_id}",
                 "body_format": "action_based",
                 "service_type": "n8n_chat"
             },
             ChatMode.GENERAL: {
-                "url": settings.N8N_GENERAL_WORKFLOW_URL or "https://chaingpt-proxy-production.up.railway.app/chat/general",
+                "url": settings.N8N_GENERAL_WORKFLOW_URL or settings.N8N_GENERAL_WORKFLOW_URL_DEFAULT,
                 "url_pattern": "{base_url}",
                 "body_format": "direct",
                 "service_type": "n8n_general"

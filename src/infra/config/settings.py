@@ -66,16 +66,20 @@ class Settings(BaseSettings):
         "https://rpc.fastnear.com"
     ]
     NEAR_MAX_RETRIES: int = 3
-    NEAR_TIMEOUT_SECONDS: int = 30
     
     # Chain Signatures Funding Settings
     NEXT_PUBLIC_FUNDER_PRIVATE_KEY: Optional[str] = None  # Private key for funding wallet
     NEAR_ENABLED: bool = True
     
-    # n8n Workflow Settings
-    N8N_TOKEN_WORKFLOW_URL: str = "https://barisarya.app.n8n.cloud/webhook/b8bce491-1fee-470c-aa7a-20a5e619fa51"
-    N8N_VESTING_WORKFLOW_URL: str = "https://mintro.app.n8n.cloud/webhook/9a30de38-7fbc-4de1-bac3-69f5b627304f"
-    N8N_GENERAL_WORKFLOW_URL: str = "https://chaingpt-proxy-production.up.railway.app/chat/general"
+    # n8n Workflow Settings (Environment-aware)
+    N8N_TOKEN_WORKFLOW_URL: Optional[str] = None  # Set via environment
+    N8N_VESTING_WORKFLOW_URL: Optional[str] = None  # Set via environment  
+    N8N_GENERAL_WORKFLOW_URL: Optional[str] = None  # Set via environment
+    
+    # Fallback n8n URLs for development (only used if env vars not set)
+    N8N_TOKEN_WORKFLOW_URL_DEFAULT: str = "https://barisarya.app.n8n.cloud/webhook/b8bce491-1fee-470c-aa7a-20a5e619fa51"
+    N8N_VESTING_WORKFLOW_URL_DEFAULT: str = "https://mintro.app.n8n.cloud/webhook/9a30de38-7fbc-4de1-bac3-69f5b627304f"
+    N8N_GENERAL_WORKFLOW_URL_DEFAULT: str = "https://chaingpt-proxy-production.up.railway.app/chat/general"
     
     # Contract Generation Settings
     CONTRACT_GENERATOR_URL: Optional[str] = None  # External contract generation service URL
@@ -84,6 +88,18 @@ class Settings(BaseSettings):
     
     # Contract Pricing Settings
     SIGNATURE_SERVICE_URL: Optional[str] = None  # External signature/pricing service URL
+    
+    # HTTP Client Timeout Settings (seconds)
+    HTTP_DEFAULT_TIMEOUT: float = 10.0
+    HTTP_CONTRACT_TIMEOUT: float = 15.0  # External service calls
+    HTTP_N8N_CHAT_TIMEOUT: float = 25.0  # Chat workflows
+    HTTP_N8N_GENERAL_TIMEOUT: float = 45.0  # Complex AI queries  
+    HTTP_NEAR_RPC_TIMEOUT: float = 5.0  # Blockchain should be fast
+    
+    # HTTP Connection Pool Settings
+    HTTP_MAX_CONNECTIONS: int = 500  # High-scale optimized
+    HTTP_MAX_KEEPALIVE_CONNECTIONS: int = 100
+    
     
     class Config:
         env_file = ".env"

@@ -34,10 +34,12 @@ router = APIRouter(
 # JWT service dependency moved to src.core.dependencies
 
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    jwt_service = Depends(get_jwt_service)
+):
     """Verify JWT token for protected endpoints."""
     try:
-        jwt_service = await get_jwt_service()
         # JWTService expects TokenType enum
         from src.core.service.auth.models.token import TokenType
         payload = await jwt_service.verify_token(credentials.credentials, TokenType.ACCESS)

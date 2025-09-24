@@ -15,30 +15,17 @@ settings = get_settings()
 class HTTPClientConfig:
     """HTTP client configuration optimized for high-scale applications"""
     
-    # Timeouts (seconds) - aggressive for high-scale
-    DEFAULT_TIMEOUT = 10.0
-    CONTRACT_TIMEOUT = 15.0  # External service calls
-    N8N_CHAT_TIMEOUT = 25.0  # Chat workflows need more time
-    N8N_GENERAL_TIMEOUT = 45.0  # Complex AI queries
-    NEAR_RPC_TIMEOUT = 5.0  # Blockchain should be fast
-    
-    # Connection limits optimized for high throughput
-    MAX_CONNECTIONS = 500  # Increased for high scale
-    MAX_KEEPALIVE_CONNECTIONS = 100  # Keep more connections alive
-    
-    # No retry configuration - fail fast for high-scale
-
     @classmethod
     def get_timeout(cls, service: str) -> float:
         """Get timeout for specific service"""
-        timeouts = {
-            "contract": cls.CONTRACT_TIMEOUT,
-            "n8n_chat": cls.N8N_CHAT_TIMEOUT,
-            "n8n_general": cls.N8N_GENERAL_TIMEOUT,
-            "near_rpc": cls.NEAR_RPC_TIMEOUT,
-            "default": cls.DEFAULT_TIMEOUT
+        timeout_map = {
+            "default": settings.HTTP_DEFAULT_TIMEOUT,
+            "contract": settings.HTTP_CONTRACT_TIMEOUT,
+            "n8n_chat": settings.HTTP_N8N_CHAT_TIMEOUT,
+            "n8n_general": settings.HTTP_N8N_GENERAL_TIMEOUT,
+            "near_rpc": settings.HTTP_NEAR_RPC_TIMEOUT,
         }
-        return timeouts.get(service, cls.DEFAULT_TIMEOUT)
+        return timeout_map.get(service, settings.HTTP_DEFAULT_TIMEOUT)
     
     @classmethod
     def get_base_headers(cls) -> Dict[str, str]:
@@ -66,8 +53,8 @@ class HTTPClientConfig:
         return {
             "timeout": client_timeout,
             "limits": httpx.Limits(
-                max_connections=cls.MAX_CONNECTIONS,
-                max_keepalive_connections=cls.MAX_KEEPALIVE_CONNECTIONS
+                max_connections=settings.HTTP_MAX_CONNECTIONS,
+                max_keepalive_connections=settings.HTTP_MAX_KEEPALIVE_CONNECTIONS
             ),
             "headers": cls.get_base_headers(),
             "follow_redirects": False,  # Explicit control
