@@ -12,6 +12,7 @@ from src.core.service.auth.challenge_service import ChallengeService
 from src.core.service.auth.cache.challenge_store import ChallengeStore
 from src.core.service.auth.cache.token_store import TokenStore
 from src.core.service.auth.multi_protocol_signature_service import MultiProtocolSignatureService
+from src.api.controller.funding.funding_controller import FundingController
 
 
 async def get_redis_client() -> Redis:
@@ -34,3 +35,8 @@ async def get_challenge_service(redis_client: Redis = Depends(get_redis_client))
 async def get_token_store(redis_client: Redis = Depends(get_redis_client)) -> TokenStore:
     """Get token store with Redis dependency."""
     return TokenStore(redis_client)
+
+
+async def get_funding_controller(redis_client: Redis = Depends(get_redis_client)) -> FundingController:
+    """Get funding controller with Redis dependency."""
+    return FundingController(redis_client)
