@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 
 from src.infra.config.settings import settings
 from src.core.logger.logger import logger
@@ -9,6 +10,7 @@ from src.api.router import health, protected, mock_endpoint, auth, chat, funding
 from src.api.middleware.security.rate_limiter import RateLimitMiddleware
 from src.api.middleware.security.audit_logger import AuditLoggingMiddleware
 from src.api.middleware.logging.request_logging import RequestLoggingMiddleware
+from src.core.exceptions.handler import ServiceError, GlobalErrorHandler
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -68,6 +70,11 @@ All protected endpoints require JWT Bearer token authentication.
 
     # Rate limiting middleware
     app.add_middleware(RateLimitMiddleware)
+
+    # Add centralized error handlers
+    app.add_exception_handler(ServiceError, GlobalErrorHandler.service_error_handler)
+    app.add_exception_handler(RequestValidationError, GlobalErrorHandler.validation_error_handler)
+    app.add_exception_handler(Exception, GlobalErrorHandler.general_exception_handler)
 
     # Include routers
     from src.api.router import websocket, config, webhook

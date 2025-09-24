@@ -9,6 +9,7 @@ from eth_account import Account
 from eth_utils import is_address
 
 from src.core.logger.logger import logger
+from src.core.exceptions.handler import ServiceError, ServiceErrorCode
 from .models import (
     FundingRequest,
     FundingResponse,
@@ -197,39 +198,38 @@ class FundingService:
                     error="INSUFFICIENT_FUNDS"
                 )
             
-            # Network connection errors
+            # Network connection errors - Technical failures
             if "connection" in error_message.lower() or "timeout" in error_message.lower() or "network" in error_message.lower():
-                return FundingResponse(
-                    success=False,
-                    funded=False,
+                raise ServiceError(
+                    code=ServiceErrorCode.NETWORK_ERROR,
                     message="Network connection error. Please try again.",
-                    error="NETWORK_ERROR"
+                    status_code=502,
+                    details={"original_error": error_message, "error_type": error_type}
                 )
             
-            # Gas estimation errors
+            # Gas estimation errors - Technical failures  
             if "gas" in error_message.lower() and ("estimate" in error_message.lower() or "limit" in error_message.lower()):
-                return FundingResponse(
-                    success=False,
-                    funded=False,
+                raise ServiceError(
+                    code=ServiceErrorCode.GAS_ESTIMATION_ERROR,
                     message="Transaction gas estimation failed",
-                    error="GAS_ESTIMATION_ERROR"
+                    status_code=500,
+                    details={"original_error": error_message, "error_type": error_type}
                 )
             
-            # Transaction failed errors
+            # Transaction failed errors - Technical failures
             if "transaction" in error_message.lower() and ("failed" in error_message.lower() or "reverted" in error_message.lower()):
-                return FundingResponse(
-                    success=False,
-                    funded=False,
+                raise ServiceError(
+                    code=ServiceErrorCode.TRANSACTION_FAILED,
                     message="Transaction failed on blockchain",
-                    error="TRANSACTION_FAILED"
+                    status_code=500,
+                    details={"original_error": error_message, "error_type": error_type}
                 )
             
-            # Generic error
-            return FundingResponse(
-                success=False,
-                funded=False,
-                message="Failed to fund address",
-                error=f"UNKNOWN_ERROR: {error_type}"
+            raise ServiceError(
+                code=ServiceErrorCode.INTERNAL_ERROR,
+                message="Failed to fund address due to unexpected error",
+                status_code=500,
+                details={"original_error": error_message, "error_type": error_type}
             )
     
     async def check_balance(self, address: str, chain_id: str) -> BalanceResponse:
