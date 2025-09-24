@@ -18,7 +18,7 @@ from src.core.service.auth.models.token import TokenType
 from src.core.logger.logger import get_logger
 from src.infra.config.settings import get_settings
 from src.infra.config.redis import get_redis
-from src.core.service.auth.cache.token_store import TokenStore
+from src.core.dependencies import get_jwt_service
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -40,10 +40,7 @@ rate_limiter = None
 chat_logger = None
 
 
-async def get_jwt_service() -> JWTService:
-    """Get JWT service with dependencies."""
-    redis_client = await get_redis()
-    return JWTService(redis_client)
+# JWT service dependency moved to src.core.dependencies
 
 
 async def init_chat_services():

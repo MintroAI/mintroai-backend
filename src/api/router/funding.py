@@ -10,9 +10,8 @@ from src.core.service.funding.models import (
     BalanceResponse,
     FundingStatus
 )
-from src.core.service.auth.jwt_service import JWTService
-from src.infra.config.redis import get_redis
 from src.core.logger.logger import logger
+from src.core.dependencies import get_jwt_service
 
 
 # Security scheme
@@ -34,10 +33,7 @@ router = APIRouter(
 funding_controller = FundingController()
 
 
-async def get_jwt_service() -> JWTService:
-    """Get JWT service with dependencies."""
-    redis_client = await get_redis()
-    return JWTService(redis_client)
+# JWT service dependency moved to src.core.dependencies
 
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
