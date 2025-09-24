@@ -2,6 +2,7 @@
 
 from typing import Optional
 from fastapi import HTTPException, Query
+from redis.asyncio import Redis
 
 from src.core.service.funding.funding_service import FundingService
 from src.core.service.funding.models import (
@@ -17,10 +18,10 @@ from src.core.logger.logger import logger
 class FundingController:
     """Controller for funding operations."""
     
-    def __init__(self):
-        """Initialize funding controller."""
+    def __init__(self, redis_client: Redis):
+        """Initialize funding controller with Redis dependency."""
         self.funding_service = FundingService()
-        self.rate_limiter = FundingRateLimiter()
+        self.rate_limiter = FundingRateLimiter(redis_client)
     
     async def fund_address(self, request: FundingRequest) -> FundingResponse:
         """

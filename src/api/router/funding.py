@@ -3,16 +3,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from src.api.controller.funding.funding_controller import FundingController
 from src.core.service.funding.models import (
     FundingRequest,
     FundingResponse,
     BalanceResponse,
     FundingStatus
 )
-from src.core.service.auth.jwt_service import JWTService
-from src.infra.config.redis import get_redis
 from src.core.logger.logger import logger
+from src.core.dependencies import get_jwt_service, get_funding_controller
 
 
 # Security scheme
@@ -30,20 +28,18 @@ router = APIRouter(
     }
 )
 
-# Initialize services
-funding_controller = FundingController()
+# FundingController is now initialized via dependency injection
 
 
-async def get_jwt_service() -> JWTService:
-    """Get JWT service with dependencies."""
-    redis_client = await get_redis()
-    return JWTService(redis_client)
+# JWT service dependency moved to src.core.dependencies
 
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    jwt_service = Depends(get_jwt_service)
+):
     """Verify JWT token for protected endpoints."""
     try:
-        jwt_service = await get_jwt_service()
         # JWTService expects TokenType enum
         from src.core.service.auth.models.token import TokenType
         payload = await jwt_service.verify_token(credentials.credentials, TokenType.ACCESS)
@@ -73,7 +69,8 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
 )
 async def fund_address(
     request: FundingRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(verify_token),
+    funding_controller = Depends(get_funding_controller)
 ) -> FundingResponse:
     """
     Fund a derived address for Chain Signatures.
@@ -112,7 +109,8 @@ async def fund_address(
 )
 async def check_balance(
     address: str,
-    chainId: str
+    chainId: str,
+    funding_controller = Depends(get_funding_controller)
 ) -> BalanceResponse:
     """
     Check address balance on specified chain.
@@ -141,7 +139,7 @@ async def check_balance(
     summary="Get funding service status",
     description="Get the status and statistics of the funding service"
 )
-async def get_funding_status() -> FundingStatus:
+async def get_funding_status(funding_controller = Depends(get_funding_controller)) -> FundingStatus:
     """
     Get funding service status and statistics.
     

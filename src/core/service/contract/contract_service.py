@@ -4,7 +4,12 @@ import os
 import logging
 import httpx
 from typing import Dict, Any
-from fastapi import HTTPException
+
+from src.core.http_client import HTTPClientConfig
+from src.core.exceptions.handler import ServiceError, ServiceErrorCode
+from src.infra.config.settings import get_settings
+
+settings = get_settings()
 
 from .models import (
     ContractData,
@@ -23,16 +28,17 @@ class ContractService:
     """Service for handling smart contract generation"""
     
     def __init__(self):
-        self.contract_generator_url = os.getenv("CONTRACT_GENERATOR_URL")
+        # Use centralized settings instead of os.getenv()
+        self.contract_generator_url = settings.CONTRACT_GENERATOR_URL
         if not self.contract_generator_url:
-            raise ValueError("CONTRACT_GENERATOR_URL environment variable is required")
+            raise ValueError("CONTRACT_GENERATOR_URL must be set in environment or settings")
         
-        self.signature_service_url = os.getenv("SIGNATURE_SERVICE_URL")
+        self.signature_service_url = settings.SIGNATURE_SERVICE_URL
         if not self.signature_service_url:
-            raise ValueError("SIGNATURE_SERVICE_URL environment variable is required")
+            raise ValueError("SIGNATURE_SERVICE_URL must be set in environment or settings")
         
-        # Configure HTTP timeout from environment or use default
-        self.http_timeout = float(os.getenv("CONTRACT_HTTP_TIMEOUT", "30.0"))
+        # Use centralized HTTP configuration
+        self.http_config = HTTPClientConfig.create_client_config("contract")
     
     async def _make_http_request(
         self,
@@ -57,7 +63,7 @@ class ContractService:
             HTTPException: If request fails
         """
         try:
-            async with httpx.AsyncClient(timeout=self.http_timeout) as client:
+            async with httpx.AsyncClient(**self.http_config) as client:
                 if method.upper() == "POST":
                     response = await client.post(
                         url,
@@ -71,33 +77,44 @@ class ContractService:
                     logger.error(
                         f"{service_name} error: {response.status_code} - {response.text}"
                     )
-                    raise HTTPException(
+                    raise ServiceError(
+                        code=ServiceErrorCode.SERVICE_UNAVAILABLE,
+                        message=f"{service_name} temporarily unavailable",
                         status_code=502,
-                        detail=f"{service_name} temporarily unavailable"
+                        details={
+                            "status_code": response.status_code,
+                            "response_text": response.text[:200]  # Limit response text
+                        }
                     )
                 
                 return response.json()
                 
         except httpx.TimeoutException:
-            logger.error(f"{service_name} timeout after {self.http_timeout}s")
-            raise HTTPException(
+            logger.error(f"{service_name} request timeout")
+            raise ServiceError(
+                code=ServiceErrorCode.TIMEOUT,
+                message=f"{service_name} request timeout",
                 status_code=504,
-                detail=f"{service_name} timeout"
+                details={"service": service_name}
             )
         except httpx.RequestError as e:
             logger.error(f"{service_name} connection error: {str(e)}")
-            raise HTTPException(
+            raise ServiceError(
+                code=ServiceErrorCode.CONNECTION_FAILED,
+                message=f"{service_name} connection failed",
                 status_code=502,
-                detail=f"{service_name} connection failed"
+                details={"service": service_name, "original_error": str(e)}
             )
         except Exception as e:
             logger.error(f"{service_name} unexpected error: {str(e)}")
-            raise HTTPException(
+            raise ServiceError(
+                code=ServiceErrorCode.INTERNAL_ERROR,
+                message=f"{service_name} request failed",
                 status_code=500,
-                detail=f"{service_name} request failed"
+                details={"service": service_name, "original_error": str(e)}
             )
     
-    def _handle_service_error(self, error: Exception, operation: str) -> HTTPException:
+    def _handle_service_error(self, error: Exception, operation: str) -> ServiceError:
         """
         Handle service-level errors with consistent logging and response
         
@@ -106,15 +123,17 @@ class ContractService:
             operation: Description of the operation that failed
             
         Returns:
-            HTTPException with appropriate status code and message
+            ServiceError with appropriate status code and message
         """
-        if isinstance(error, HTTPException):
+        if isinstance(error, ServiceError):
             return error
         
         logger.error(f"{operation} error: {str(error)}")
-        return HTTPException(
+        return ServiceError(
+            code=ServiceErrorCode.INTERNAL_ERROR,
+            message=f"Failed to {operation.lower()}",
             status_code=500,
-            detail=f"Failed to {operation.lower()}: {str(error)}"
+            details={"operation": operation, "original_error": str(error)}
         )
     
     async def generate_contract(

@@ -3,8 +3,8 @@
 import time
 from typing import Dict, Optional
 from datetime import datetime, timedelta
+from redis.asyncio import Redis
 
-from src.infra.config.redis import get_redis
 from src.core.logger.logger import logger
 
 
@@ -15,9 +15,9 @@ class FundingRateLimiter:
     DAILY_LIMIT = 10  # Max funding requests per day per user
     RATE_LIMIT_WINDOW = 86400  # 24 hours in seconds
     
-    def __init__(self):
-        """Initialize rate limiter."""
-        self.redis = None  # Will be initialized on first use
+    def __init__(self, redis_client: Redis):
+        """Initialize rate limiter with Redis client."""
+        self.redis = redis_client
     
     async def check_rate_limit(self, user_wallet: str) -> Dict:
         """
@@ -30,9 +30,6 @@ class FundingRateLimiter:
             Dict with rate limit info
         """
         try:
-            # Get Redis connection if not already initialized
-            if not self.redis:
-                self.redis = await get_redis()
             
             # Create key for user's daily funding count
             key = f"funding:rate_limit:{user_wallet}:{datetime.utcnow().strftime('%Y%m%d')}"
@@ -92,9 +89,6 @@ class FundingRateLimiter:
             user_wallet: User's wallet address
         """
         try:
-            # Get Redis connection if not already initialized
-            if not self.redis:
-                self.redis = await get_redis()
             
             # Create key for user's daily funding count
             key = f"funding:rate_limit:{user_wallet}:{datetime.utcnow().strftime('%Y%m%d')}"

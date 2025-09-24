@@ -14,10 +14,9 @@ from src.core.service.contract.models import (
     PriceContractRequest,
     PriceContractResponse
 )
-from src.core.service.auth.jwt_service import JWTService
 from src.core.service.auth.models.token import TokenType
-from src.infra.config.redis import get_redis
 from src.core.logger.logger import logger
+from src.core.dependencies import get_jwt_service
 
 
 # Security scheme
@@ -33,16 +32,15 @@ router = APIRouter(
     }
 )
 
-async def get_jwt_service() -> JWTService:
-    """Get JWT service with dependencies."""
-    redis_client = await get_redis()
-    return JWTService(redis_client)
+# JWT service dependency moved to src.core.dependencies
 
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    jwt_service = Depends(get_jwt_service)
+):
     """Verify JWT token - required for this endpoint."""
     try:
-        jwt_service = await get_jwt_service()
         payload = await jwt_service.verify_token(credentials.credentials, TokenType.ACCESS)
         return payload
     except Exception as e:

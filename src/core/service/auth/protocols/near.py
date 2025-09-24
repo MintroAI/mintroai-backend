@@ -12,6 +12,8 @@ import json
 from typing import Tuple, Optional, Dict, Any
 from datetime import datetime, timezone
 
+from src.core.http_client import HTTPClientConfig
+
 try:
     from py_near.account import Account
     from py_near.providers import JsonProvider
@@ -49,6 +51,8 @@ class NEARVerifier(WalletVerifier):
         self.config: NEARConfig = config
         self.provider: Optional[JsonProvider] = None
         self._connection_established = False
+        # Configure HTTP client for NEAR RPC calls
+        self.http_config = HTTPClientConfig.create_client_config("near_rpc")
         
         # NEAR account validation patterns
         self.account_patterns = {
@@ -376,7 +380,7 @@ class NEARVerifier(WalletVerifier):
             # Use direct HTTP RPC to get access keys (more reliable than py-near)
             rpc_url = self.config.rpc_urls[0] if self.config.rpc_urls else "https://rpc.testnet.near.org"
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(**self.http_config) as client:
                 # Get access keys for the account
                 payload = {
                     "jsonrpc": "2.0",
@@ -457,7 +461,7 @@ class NEARVerifier(WalletVerifier):
         try:
             rpc_url = self.config.rpc_urls[0] if self.config.rpc_urls else "https://rpc.testnet.near.org"
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(**self.http_config) as client:
                 # Get account state
                 account_payload = {
                     "jsonrpc": "2.0",

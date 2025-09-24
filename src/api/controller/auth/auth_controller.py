@@ -16,15 +16,12 @@ from src.api.controller.auth.dto.output_dto import (
 from src.api.controller.auth.dto.error_responses import ErrorCode, ErrorDetail, ErrorResponse
 from src.api.utils.validators import RequestValidator, ValidationException, validation_exception_handler
 
-from src.core.service.auth.challenge_service import ChallengeService
 from src.core.service.auth.jwt_service import JWTService, TokenType
-from src.core.service.auth.multi_protocol_signature_service import MultiProtocolSignatureService
+from src.core.service.auth.challenge_service import ChallengeService
 from src.core.service.auth.protocols.base import BlockchainProtocol, protocol_registry
 from src.core.service.auth.protocols.evm import create_evm_verifier
 from src.core.service.auth.protocols.near import create_near_verifier
-from src.core.service.auth.cache.challenge_store import ChallengeStore
-from src.core.service.auth.cache.token_store import TokenStore
-from src.infra.config.redis import get_redis
+from src.core.dependencies import get_jwt_service, get_challenge_service
 from src.infra.config.settings import get_settings
 from src.core.logger.logger import get_logger
 
@@ -102,23 +99,7 @@ async def init_protocols():
         raise
 
 
-# Dependency providers
-async def get_challenge_service() -> ChallengeService:
-    """Get challenge service with dependencies."""
-    redis_client = await get_redis()
-    challenge_store = ChallengeStore(redis_client)
-    
-    # Initialize multi-protocol signature service (no constructor args needed)
-    multi_signature_service = MultiProtocolSignatureService()
-    
-    return ChallengeService(challenge_store, multi_signature_service)
-
-
-async def get_jwt_service() -> JWTService:
-    """Get JWT service with dependencies."""
-    redis_client = await get_redis()
-    token_store = TokenStore(redis_client)
-    return JWTService(token_store)
+# Dependency providers moved to src.core.dependencies
 
 
 @router.post(

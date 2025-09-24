@@ -17,8 +17,7 @@ from src.core.service.auth.jwt_service import JWTService
 from src.core.service.auth.models.token import TokenType
 from src.core.logger.logger import get_logger
 from src.infra.config.settings import get_settings
-from src.infra.config.redis import get_redis
-from src.core.service.auth.cache.token_store import TokenStore
+from src.core.dependencies import get_jwt_service
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -40,10 +39,7 @@ rate_limiter = None
 chat_logger = None
 
 
-async def get_jwt_service() -> JWTService:
-    """Get JWT service with dependencies."""
-    redis_client = await get_redis()
-    return JWTService(redis_client)
+# JWT service dependency moved to src.core.dependencies
 
 
 async def init_chat_services():
@@ -51,8 +47,9 @@ async def init_chat_services():
     global n8n_client, rate_limiter, chat_logger
     
     try:
-        # Get Redis connection
-        redis_client = await get_redis()
+        # Get Redis connection using dependency injection
+        from src.core.dependencies import get_redis_client
+        redis_client = await get_redis_client()
         
         # Initialize services with Redis
         n8n_client = N8nClient()
@@ -104,7 +101,6 @@ async def get_user_context(
         
         # Determine user type (could be enhanced with database lookup)
         user_type = "authenticated"
-        # TODO: Check if user is premium based on database or claims
         
         return UserContext(
             wallet_address=wallet_address,

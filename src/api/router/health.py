@@ -1,23 +1,23 @@
 import json
-from fastapi import APIRouter, status, Request
+from fastapi import APIRouter, status, Request, Depends
 from datetime import datetime
 from typing import Dict, Any
+from redis.asyncio import Redis
 
 from src.core.logger.logger import logger
 from src.core.service.auth.protocols.base import protocol_registry, BlockchainProtocol
 from src.core.service.funding.funding_service import FundingService
-from src.infra.config.redis import get_redis
 from src.api.controller.auth.dto.output_dto import HealthCheckResponseDto
 from src.api.utils.metrics import get_metrics
+from src.core.dependencies import get_redis_client
 
 router = APIRouter()
 
 from src.infra.config.settings import settings
 
-async def check_redis_health() -> Dict[str, str]:
+async def check_redis_health(redis_client: Redis) -> Dict[str, str]:
     """Check Redis connection health."""
     try:
-        redis_client = await get_redis()
         await redis_client.ping()
         return {"status": "healthy", "message": "Connected"}
     except Exception as e:
@@ -111,7 +111,7 @@ async def check_protocol_health() -> Dict[str, Dict[str, Any]]:
 
 
 @router.get("/health", status_code=status.HTTP_200_OK)
-async def health_check(request: Request):
+async def health_check(request: Request, redis_client: Redis = Depends(get_redis_client)):
     """
     Enhanced health check endpoint with protocol-specific checks.
     Returns detailed status of all system components including auth protocols.
@@ -120,7 +120,7 @@ async def health_check(request: Request):
     correlation_id = request.headers.get("X-Request-ID", "N/A")
     
     # Check Redis health
-    redis_health = await check_redis_health()
+    redis_health = await check_redis_health(redis_client)
     
     # Check protocol health
     protocol_health = await check_protocol_health()
