@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",  # Frontend development
+        "http://152.53.153.177:3000",  # Server frontend (HTTP)
+        "http://152.53.153.177",  # Server frontend (HTTP, port 80)
         "https://app.mintroai.ai",  # Production frontend
     ]
 
