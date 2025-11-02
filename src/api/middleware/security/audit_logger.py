@@ -228,8 +228,9 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         return request.client.host if request.client else "unknown"
     
     async def dispatch(self, request: Request, call_next) -> Response:
-        # Skip audit logging for health checks and docs
-        if request.url.path in ["/health", "/docs", "/redoc", "/openapi.json"]:
+        # Skip audit logging for CORS preflight, health checks and docs
+        if (request.method == "OPTIONS" or 
+            request.url.path in ["/health", "/docs", "/redoc", "/openapi.json"]):
             return await call_next(request)
         
         start_time = datetime.utcnow()
