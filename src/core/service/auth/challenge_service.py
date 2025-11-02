@@ -15,9 +15,15 @@ class ChallengeService:
     CHALLENGE_EXPIRY_SECONDS = settings.CHALLENGE_EXPIRY_SECONDS
     NONCE_BYTES = 32  # 256 bits of entropy
     
-    def __init__(self, challenge_store, signature_service: Optional[MultiProtocolSignatureService] = None):
+    def __init__(
+        self, 
+        challenge_store, 
+        signature_service: Optional[MultiProtocolSignatureService] = None,
+        user_repository = None
+    ):
         self.store = challenge_store
         self.signature_service = signature_service or MultiProtocolSignatureService()
+        self.user_repository = user_repository
     
     def _generate_nonce(self) -> str:
         """Generate a cryptographically secure nonce"""
@@ -56,6 +62,19 @@ class ChallengeService:
         # Store challenge
         await self.store.save_challenge(challenge)
         logger.info(f"Created new challenge for {wallet_address}")
+        
+        # Log to database (non-blocking)
+        if self.user_repository:
+            try:
+                await self.user_repository.update_user_challenge(wallet_address, protocol.value)
+            except Exception as db_error:
+                logger.error(
+                    f"Failed to log challenge to database: {db_error}",
+                    extra={
+                        "wallet_address": wallet_address,
+                        "protocol": protocol.value
+                    }
+                )
         
         return challenge
     
@@ -136,6 +155,20 @@ class ChallengeService:
             f"Challenge verified successfully for {wallet_address}",
             extra={"protocol": protocol.value}
         )
+        
+        # Log successful login to database (non-blocking)
+        if self.user_repository:
+            try:
+                await self.user_repository.update_user_login(wallet_address, protocol.value)
+            except Exception as db_error:
+                logger.error(
+                    f"Failed to log user login to database: {db_error}",
+                    extra={
+                        "wallet_address": wallet_address,
+                        "protocol": protocol.value
+                    }
+                )
+        
         return True, None
     
     async def invalidate_challenge(self, wallet_address: str, status: ChallengeStatus) -> None:

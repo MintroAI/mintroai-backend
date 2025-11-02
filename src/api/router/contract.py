@@ -16,7 +16,7 @@ from src.core.service.contract.models import (
 )
 from src.core.service.auth.models.token import TokenType
 from src.core.logger.logger import logger
-from src.core.dependencies import get_jwt_service
+from src.core.dependencies import get_jwt_service, get_contract_activity_repository
 
 
 # Security scheme
@@ -60,7 +60,8 @@ async def verify_token(
 )
 async def generate_contract(
     contract_data: Union[TokenContractData, VestingContractData],
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(verify_token),
+    activity_repository = Depends(get_contract_activity_repository)
 ) -> ContractGenerationResponse:
     """
     Generate a smart contract with the provided configuration.
@@ -74,7 +75,7 @@ async def generate_contract(
     Returns:
         ContractGenerationResponse with generated contract code
     """
-    controller = ContractController()
+    controller = ContractController(activity_repository)
     return await controller.generate_contract(
         contract_data=contract_data,
         current_user=current_user
@@ -90,7 +91,8 @@ async def generate_contract(
 )
 async def compile_contract(
     request: dict,  # Geçici olarak dict yapalım
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(verify_token),
+    activity_repository = Depends(get_contract_activity_repository)
 ) -> CompileContractResponse:
     """
     Compile a smart contract that was previously generated.
@@ -109,7 +111,7 @@ async def compile_contract(
     if not chat_id:
         raise HTTPException(status_code=400, detail="chatId field is required")
     
-    controller = ContractController()
+    controller = ContractController(activity_repository)
     return await controller.compile_contract(
         chat_id=chat_id,
         current_user=current_user
@@ -125,7 +127,8 @@ async def compile_contract(
 )
 async def get_contract_price(
     price_request: PriceContractRequest,
-    current_user: dict = Depends(verify_token)
+    current_user: dict = Depends(verify_token),
+    activity_repository = Depends(get_contract_activity_repository)
 ) -> PriceContractResponse:
     """
     Get deployment price and signature for a smart contract.
@@ -140,7 +143,7 @@ async def get_contract_price(
     Returns:
         PriceContractResponse with pricing and signature data
     """
-    controller = ContractController()
+    controller = ContractController(activity_repository)
     return await controller.get_price(
         price_request=price_request,
         current_user=current_user
