@@ -22,19 +22,19 @@ class N8nWorkflowConfig:
     def __init__(self):
         self.workflows = {
             ChatMode.TOKEN: {
-                "url": settings.N8N_TOKEN_WORKFLOW_URL or settings.N8N_TOKEN_WORKFLOW_URL_DEFAULT,
+                "url": settings.N8N_TOKEN_WORKFLOW_URL,
                 "url_pattern": "{base_url}/{session_id}",
                 "body_format": "action_based",
                 "service_type": "n8n_chat"
             },
             ChatMode.VESTING: {
-                "url": settings.N8N_VESTING_WORKFLOW_URL or settings.N8N_VESTING_WORKFLOW_URL_DEFAULT,
+                "url": settings.N8N_VESTING_WORKFLOW_URL,
                 "url_pattern": "{base_url}/{session_id}",
                 "body_format": "action_based",
                 "service_type": "n8n_chat"
             },
             ChatMode.GENERAL: {
-                "url": settings.N8N_GENERAL_WORKFLOW_URL or settings.N8N_GENERAL_WORKFLOW_URL_DEFAULT,
+                "url": settings.N8N_GENERAL_WORKFLOW_URL,
                 "url_pattern": "{base_url}",
                 "body_format": "direct",
                 "service_type": "n8n_general"

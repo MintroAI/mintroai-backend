@@ -34,9 +34,7 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",  # Frontend development
-        "https://app.mintroai.com",  # Production frontend
-        "file://*",  # Local HTML files for testing
-        "null"  # For file:// protocol
+        "https://app.mintroai.ai",  # Production frontend
     ]
 
     # Redis Settings
@@ -44,10 +42,10 @@ class Settings(BaseSettings):
     REDIS_MAX_CONNECTIONS: int = 10
     
     # PostgreSQL Settings
-    POSTGRES_HOST: str = "152.53.153.177"
+    POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
-    POSTGRES_USER: str = "root"
-    POSTGRES_PASSWORD: str = "root"
+    POSTGRES_USER: str = ""
+    POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = "postgres"
     POSTGRES_MIN_POOL_SIZE: int = 5
     POSTGRES_MAX_POOL_SIZE: int = 20
@@ -85,11 +83,6 @@ class Settings(BaseSettings):
     N8N_TOKEN_WORKFLOW_URL: Optional[str] = None  # Set via environment
     N8N_VESTING_WORKFLOW_URL: Optional[str] = None  # Set via environment  
     N8N_GENERAL_WORKFLOW_URL: Optional[str] = None  # Set via environment
-    
-    # Fallback n8n URLs for development (only used if env vars not set)
-    N8N_TOKEN_WORKFLOW_URL_DEFAULT: str = "https://barisarya.app.n8n.cloud/webhook/b8bce491-1fee-470c-aa7a-20a5e619fa51"
-    N8N_VESTING_WORKFLOW_URL_DEFAULT: str = "https://mintro.app.n8n.cloud/webhook/9a30de38-7fbc-4de1-bac3-69f5b627304f"
-    N8N_GENERAL_WORKFLOW_URL_DEFAULT: str = "https://chaingpt-proxy-production.up.railway.app/chat/general"
     
     # Contract Generation Settings
     CONTRACT_GENERATOR_URL: Optional[str] = None  # External contract generation service URL

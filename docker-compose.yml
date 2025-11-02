@@ -36,37 +36,37 @@ services:
       - REDIS_MAX_CONNECTIONS=10
 
       # PostgreSQL connection
-      - POSTGRES_HOST=${POSTGRES_HOST:-152.53.153.177}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_USER=${POSTGRES_USER:-root}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-root}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-      - POSTGRES_MIN_POOL_SIZE=${POSTGRES_MIN_POOL_SIZE:-5}
-      - POSTGRES_MAX_POOL_SIZE=${POSTGRES_MAX_POOL_SIZE:-20}
-      - DB_LOGGING_ENABLED=${DB_LOGGING_ENABLED:-false}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_MIN_POOL_SIZE=${POSTGRES_MIN_POOL_SIZE}
+      - POSTGRES_MAX_POOL_SIZE=${POSTGRES_MAX_POOL_SIZE}
+      - DB_LOGGING_ENABLED=${DB_LOGGING_ENABLED}
 
       # App settings
-      - DEBUG=false
-      - HOST=0.0.0.0
-      - PORT=8080
+      - DEBUG=${DEBUG}
+      - HOST=${HOST}
+      - PORT=${PORT}
 
-      # Security (use environment file for production)
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-change-in-production}
-      - JWT_ALGORITHM=HS256
+      # Security
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
 
       # NEAR settings
-      - NEAR_ENABLED=true
-      - NEAR_NETWORK_ID=mainnet
+      - NEAR_ENABLED=${NEAR_ENABLED}
+      - NEAR_NETWORK_ID=${NEAR_NETWORK_ID}
 
-      # External services (set in production)
+      # External services
       - CONTRACT_GENERATOR_URL=${CONTRACT_GENERATOR_URL}
       - SIGNATURE_SERVICE_URL=${SIGNATURE_SERVICE_URL}
       - N8N_TOKEN_WORKFLOW_URL=${N8N_TOKEN_WORKFLOW_URL}
       - N8N_VESTING_WORKFLOW_URL=${N8N_VESTING_WORKFLOW_URL}
       - N8N_GENERAL_WORKFLOW_URL=${N8N_GENERAL_WORKFLOW_URL}
 
-      # CORS origins (adjust for production)
-      - ALLOWED_ORIGINS=["http://localhost:3000","https://app.mintroai.com"]
+      # CORS origins
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
 
     depends_on:
       redis:
