@@ -180,8 +180,10 @@ class NEARVerifier(WalletVerifier):
             
             # Check if signature is NEAR signMessage format (dict)
             if isinstance(signature, dict):
+                # Use provided recipient or default to server address
+                default_recipient = recipient or "http://152.53.153.177:3000"
                 return await self._verify_sign_message_format(
-                    signature, message, nonce, recipient or "http://localhost:3000"
+                    signature, message, nonce, default_recipient
                 )
             
             # Legacy format - string signature
