@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_MAX_CONNECTIONS: int = 10
     
+    # PostgreSQL Settings
+    POSTGRES_HOST: str = "152.53.153.177"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str = "root"
+    POSTGRES_PASSWORD: str = "root"
+    POSTGRES_DB: str = "postgres"
+    POSTGRES_MIN_POOL_SIZE: int = 5
+    POSTGRES_MAX_POOL_SIZE: int = 20
+    DB_LOGGING_ENABLED: bool = True
+    
     # Challenge Settings
     CHALLENGE_EXPIRY_SECONDS: int = 300  # 5 minutes
 

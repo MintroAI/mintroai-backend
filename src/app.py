@@ -108,6 +108,16 @@ All protected endpoints require JWT Bearer token authentication.
             "version": settings.APP_VERSION
         }))
         
+        # Initialize database with SQLAlchemy
+        try:
+            from src.infra.database import get_database_manager
+            db_manager = get_database_manager()
+            await db_manager.connect()
+            logger.info("Database initialized with SQLAlchemy successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database (non-critical): {str(e)}")
+            logger.warning("Application will continue without database persistence")
+        
         # Initialize protocol verifiers
         try:
             from src.api.router.auth import init_protocols
@@ -130,5 +140,14 @@ All protected endpoints require JWT Bearer token authentication.
             "service": settings.APP_NAME,
             "version": settings.APP_VERSION
         }))
+        
+        # Close database engine
+        try:
+            from src.infra.database import get_database_manager
+            db_manager = get_database_manager()
+            await db_manager.close()
+            logger.info("Database engine closed gracefully")
+        except Exception as e:
+            logger.error(f"Error closing database engine: {str(e)}")
 
     return app
